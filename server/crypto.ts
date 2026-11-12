@@ -1,11 +1,12 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { ConfigError } from "./db.js";
 
 /** Server secret: FOLIO_SECRET, or a key file created on first run (never committed). */
 function loadSecret(): Buffer {
   if (process.env.FOLIO_SECRET) return crypto.createHash("sha256").update(process.env.FOLIO_SECRET).digest();
-  if (process.env.VERCEL) throw new Error("FOLIO_SECRET is not set. Add it in the Vercel project settings (any long random string).");
+  if (process.env.VERCEL) throw new ConfigError("FOLIO_SECRET is not set. Add it in Vercel → Project → Settings → Environment Variables, then redeploy.");
   const file = path.resolve("data/secret.key");
   if (!fs.existsSync(file)) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -13,7 +14,10 @@ function loadSecret(): Buffer {
   }
   return Buffer.from(fs.readFileSync(file, "utf8").trim(), "hex");
 }
-const SECRET = loadSecret();
+// Loaded on first use, so a missing secret is reported as a clear error instead of crashing the function at start-up.
+let secret: Buffer | null = null;
+const SECRET_KEY = () => (secret ??= loadSecret());
+export const secretConfigured = () => !!process.env.FOLIO_SECRET || !process.env.VERCEL;
 
 export const sha256 = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
 export const randomToken = (bytes = 32) => crypto.randomBytes(bytes).toString("base64url");
@@ -21,7 +25,7 @@ export const randomToken = (bytes = 32) => crypto.randomBytes(bytes).toString("b
 /** AES-256-GCM for third-party API keys at rest. */
 export function encrypt(plain: string): string {
   const iv = crypto.randomBytes(12);
-  const c = crypto.createCipheriv("aes-256-gcm", SECRET, iv);
+  const c = crypto.createCipheriv("aes-256-gcm", SECRET_KEY(), iv);
   const body = Buffer.concat([c.update(plain, "utf8"), c.final()]);
   return [iv, c.getAuthTag(), body].map((b) => b.toString("base64url")).join(".");
 }
@@ -29,7 +33,7 @@ export function decrypt(enc: string | null | undefined): string | null {
   if (!enc) return null;
   try {
     const [iv, tag, body] = enc.split(".").map((s) => Buffer.from(s, "base64url"));
-    const d = crypto.createDecipheriv("aes-256-gcm", SECRET, iv);
+    const d = crypto.createDecipheriv("aes-256-gcm", SECRET_KEY(), iv);
     d.setAuthTag(tag);
     return Buffer.concat([d.update(body), d.final()]).toString("utf8");
   } catch { return null; }

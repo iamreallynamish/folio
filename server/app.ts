@@ -1,5 +1,6 @@
 import express, { type Request, type Response, type NextFunction } from "express";
-import { ready } from "./db.js";
+import { ConfigError, explainDbError, ready } from "./db.js";
+import { secretConfigured } from "./crypto.js";
 import { changePassword, csrf, HttpError, login, logout, register, requireUser, userByIngestToken } from "./auth.js";
 import { core, h, ingestBody } from "./routes/core.js";
 import { income } from "./routes/income.js";
@@ -19,7 +20,15 @@ app.use((_req, res, next) => {
   next();
 });
 // Connect and create the schema before the first API request is handled.
-app.use("/api", (_req, _res, next) => { ready().then(() => next(), next); });
+/** Deployment check: open /api/health in a browser. Reports configuration problems, never values. */
+app.get("/api/health", async (_req, res) => {
+  const secret = secretConfigured();
+  let database = "ok";
+  try { await ready(); } catch (e) { database = explainDbError(e); }
+  res.setHeader("Cache-Control", "no-store");
+  res.status(database === "ok" && secret ? 200 : 503).json({ ok: database === "ok" && secret, database, secret: secret ? "ok" : "FOLIO_SECRET is not set." });
+});
+app.use("/api", (_req, _res, next) => { ready().then(() => next(), (e) => next(new ConfigError(explainDbError(e)))); });
 app.use("/api", express.json({ limit: "5mb" }), (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); }, csrf);
 
 app.post("/api/auth/register", h(register));
@@ -51,6 +60,7 @@ app.use("/api", (_req, _res, next) => next(new HttpError(404, "Not found.")));
 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
+  if (err instanceof ConfigError) { console.error(err.message); return res.status(503).json({ error: `Folio is not set up correctly: ${err.message}` }); }
   if (err?.type === "entity.too.large") return res.status(413).json({ error: "That file is too large." });
   if (err?.type === "entity.parse.failed") return res.status(400).json({ error: "Invalid request." });
   console.error(err);

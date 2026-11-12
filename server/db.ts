@@ -147,9 +147,26 @@ async function pgliteDriver(): Promise<Driver> {
   return { base: wrap(db), transaction: (fn) => db.transaction((t) => fn(wrap(t))) };
 }
 
+/** A deployment configuration problem, reported to the browser in plain words (never with secrets). */
+export class ConfigError extends Error {}
+
+/** Turns a connection failure into an actionable message without echoing the connection string. */
+export function explainDbError(e: any): string {
+  const code = e?.code, msg = String(e?.message ?? "");
+  if (e instanceof ConfigError) return msg;
+  if (code === "ERR_INVALID_URL" || /invalid url/i.test(msg)) return "DATABASE_URL is not a valid URL. Check for a leftover [YOUR-PASSWORD] or square brackets, and percent-encode special characters in the password (or reset it to letters and digits).";
+  if (code === "28P01" || /password authentication failed/i.test(msg)) return "The database rejected the password in DATABASE_URL. Reset it in Supabase → Project Settings → Database and update the variable.";
+  if (/tenant or user not found/i.test(msg)) return "Supabase did not recognise the user in DATABASE_URL. It must be postgres.<project-ref>, as shown in the Transaction pooler string.";
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN") return "The database host in DATABASE_URL could not be found. Copy the Transaction pooler string again from Supabase → Connect.";
+  if (code === "ECONNREFUSED" || code === "ETIMEDOUT" || /timeout/i.test(msg)) return "Could not reach the database. Use the Transaction pooler string (host …pooler.supabase.com, port 6543), not the direct db.… host.";
+  if (/certificate|self.signed|SSL/i.test(msg)) return "The database TLS check failed. Remove DATABASE_CA or paste the full certificate from Supabase.";
+  return `Could not connect to the database (${code ?? "unknown error"}).`;
+}
+
 async function init(): Promise<Driver> {
-  const url = process.env.DATABASE_URL;
-  if (!url && process.env.VERCEL) throw new Error("DATABASE_URL is not set. Add your Supabase connection string in the Vercel project settings.");
+  const url = process.env.DATABASE_URL?.trim();
+  if (!url && process.env.VERCEL) throw new ConfigError("DATABASE_URL is not set. Add your Supabase Transaction pooler string in Vercel → Project → Settings → Environment Variables, then redeploy.");
+  if (url && /\[YOUR-PASSWORD\]/i.test(url)) throw new ConfigError("DATABASE_URL still contains [YOUR-PASSWORD]. Replace it, including the brackets, with your database password.");
   const d = url ? await postgresDriver(url) : await pgliteDriver();
   await d.transaction(async (e) => {
     // Serialise schema setup when several serverless instances start at once.
