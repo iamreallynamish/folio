@@ -61,8 +61,9 @@ export function Assistant() {
         <div ref={end} />
       </div>
 
-      <div className="stack" style={{ gap: 10 }}>
-        <div className="chips">{SUGGESTIONS.map((s) => <button key={s} className="chip" onClick={() => ask(s)}>{s}</button>)}</div>
+      {/* Suggestions and the composer stay together at the bottom; the conversation scrolls behind them. */}
+      <div className="ask-dock">
+        <div className="chips ask-chips">{SUGGESTIONS.map((s) => <button key={s} className="chip" onClick={() => ask(s)}>{s}</button>)}</div>
         <form className="composer" onSubmit={(e) => { e.preventDefault(); ask(input); }}>
           {user.hasAssistantKey && (
             <button type="button" className="chip" aria-pressed={ai} onClick={() => setAi(!ai)} title="Send every question to Claude for a written, AI-generated answer" style={{ alignSelf: "center", flex: "none" }}><Icon name="spark" style={{ width: 13, height: 13 }} />AI</button>

@@ -88,9 +88,9 @@ portfolio.get("/portfolio/news", h(async (req, res) => {
   if (!key || !symbols.length) return res.json({ news: [], earnings: [], notice: null });
   let notice: string | null = null, items: any[] = [], cal: any[] = [];
   try { const n = await news(key, symbols); items = n.data; if (n.stale) notice = "News could not be refreshed; showing saved articles."; }
-  catch (e) { notice = e instanceof MarketError ? e.message : "News is unavailable right now."; }
+  catch (e) { notice = e instanceof MarketError && e.code === "rate_limit" ? "News has reached today's free market-data limit. It will load again later." : e instanceof MarketError ? e.message : "News is unavailable right now."; }
   for (const s of symbols.slice(0, 10)) {
-    try { cal.push(...(await earnings(key, s)).data); } catch (e) { if (e instanceof MarketError && e.code === "rate_limit") { notice ??= e.message; break; } }
+    try { cal.push(...(await earnings(key, s)).data); } catch (e) { if (e instanceof MarketError && e.code === "rate_limit") { notice ??= "Earnings dates have reached today's free market-data limit. They will load again later."; break; } }
   }
   res.json({ news: items, earnings: cal.sort((a, b) => a.reportDate.localeCompare(b.reportDate)), notice });
 }));

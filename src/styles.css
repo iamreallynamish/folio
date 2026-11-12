@@ -865,3 +865,33 @@ h1.text-reveal { font-size: 32px; font-weight: 600; letter-spacing: -0.05em; }
 ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
 ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--label) 26%, transparent); border: 3px solid transparent; border-radius: 10px; background-clip: padding-box; }
 ::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--label) 42%, transparent); }
+
+/* ---------- Sheets clip their scrolling content to their rounded corners ----------
+   The scroll area was square inside a rounded sheet, so rows scrolled into a bottom corner poked out past the curve. */
+.sheet { overflow: hidden; isolation: isolate; }
+.sheet-body { border-bottom-left-radius: inherit; border-bottom-right-radius: inherit; }
+
+/* ---------- Assistant: suggestions and composer are one docked bar ----------
+   Only the composer was sticky, so it slid over the suggestion chips; and the long chip row widened the page. */
+.ask-dock { position: sticky; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 6px); z-index: 5; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding-top: 18px; margin-top: -18px;
+  background: linear-gradient(to bottom, transparent, var(--bg) 18px); }
+.ask-dock .composer { position: static; }
+.ask-chips { margin: 0; padding: 2px 0; min-width: 0;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 28px), transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 28px), transparent); }
+.ask-chips .chip { flex: none; }
+.ask-chips .chip:first-child { margin-left: 12px; }
+.ask-chips .chip:last-child { margin-right: 24px; }
+@media (min-width: 900px) { .ask-dock { bottom: 20px; } }
+.screen > * { min-width: 0; }
+
+/* ---------- Notices are solid, so nothing behind them shows through ---------- */
+.notice { background: var(--surface); }
+.notice.warning { background: color-mix(in srgb, var(--warning) 14%, var(--surface)); }
+.notice.over { background: color-mix(in srgb, var(--negative) 14%, var(--surface)); }
+/* The content column may shrink below its widest child (a long answer, a chip row), so it never pushes past the window. */
+.main, .screen { min-width: 0; }
+/* The dock's backdrop continues down to the tab bar (phones) or the window edge, so no answer peeks out underneath. */
+.ask-dock { padding-top: 28px; margin-top: -28px; background: linear-gradient(to bottom, transparent, var(--bg) 26px); }
+.ask-dock::after { content: ""; position: absolute; left: -2px; right: -2px; top: 100%; height: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 8px); background: var(--bg); pointer-events: none; }
+@media (min-width: 900px) { .ask-dock::after { height: 22px; } }

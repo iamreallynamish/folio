@@ -118,10 +118,14 @@ export function Invest() {
 
       {(data.contributors.totalUp.length > 0 || data.contributors.totalDown.length > 0) && (
         <div className="grid-2">
-          <Contrib title="Biggest gains" rows={data.contributors.totalUp} field="gain" pctField="gainPct" />
-          <Contrib title="Biggest losses" rows={data.contributors.totalDown} field="gain" pctField="gainPct" />
-          <Contrib title="Lifted the latest day" rows={data.contributors.dayUp} field="dayChange" pctField="dayChangePct" />
-          <Contrib title="Weighed on the latest day" rows={data.contributors.dayDown} field="dayChange" pctField="dayChangePct" />
+          <div className="stack" style={{ gap: 16 }}>
+            <Contrib title="Biggest gains" rows={data.contributors.totalUp} field="gain" pctField="gainPct" />
+            <Contrib title="Biggest losses" rows={data.contributors.totalDown} field="gain" pctField="gainPct" />
+          </div>
+          <div className="stack" style={{ gap: 16 }}>
+            <Contrib title="Lifted the latest day" rows={data.contributors.dayUp} field="dayChange" pctField="dayChangePct" />
+            <Contrib title="Weighed on the latest day" rows={data.contributors.dayDown} field="dayChange" pctField="dayChangePct" />
+          </div>
         </div>
       )}
 
@@ -142,6 +146,7 @@ export function Invest() {
           </section>
           <section>
             <div className="section-label">News on your holdings</div>
+            <div className="stack" style={{ gap: 10 }}>
             {news.data?.notice && <Notice kind="warning">{news.data.notice}</Notice>}
             <div className="list">
               {(news.data?.news ?? []).slice(0, 8).map((n: any, i: number) => (
@@ -151,7 +156,8 @@ export function Invest() {
                   <Icon name="chevron" className="chev" style={{ marginTop: 4 }} />
                 </a>
               ))}
-              {news.data && news.data.news.length === 0 && <div className="cell muted subhead">No recent articles found.</div>}
+              {news.data && news.data.news.length === 0 && <div className="cell muted subhead">{news.data.notice ? "Articles will appear once news loads." : "No recent articles found."}</div>}
+            </div>
             </div>
             <p className="caption faint" style={{ padding: "6px 16px" }}>Headlines and sentiment labels are supplied by Alpha Vantage.</p>
           </section>

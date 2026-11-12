@@ -24,6 +24,11 @@ export function relTime(iso: string) {
 }
 export const shiftMonth = (m: string, by: number) => { const d = new Date(Number(m.slice(0, 4)), Number(m.slice(5)) - 1 + by, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
 export const slotColor = (slot: number | null | undefined) => `var(--s${slot ?? 0})`;
-export const plain = (n: number, currency: string) => `${currency} ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/** Market amounts with two decimals and the currency's symbol: ₹1,23,456.00 (Indian grouping), ¥4,207.50, $12.30. */
+export const plain = (n: number, currency: string) => {
+  try {
+    return new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", { style: "currency", currency, currencyDisplay: "narrowSymbol", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  } catch { return `${currency} ${n.toFixed(2)}`; }
+};
 export const signed = (n: number, currency: string) => `${n < 0 ? "−" : "+"}${plain(Math.abs(n), currency)}`;
 export const pct = (n: number | null) => (n == null ? "—" : `${n < 0 ? "−" : "+"}${Math.abs(n).toFixed(2)}%`);
