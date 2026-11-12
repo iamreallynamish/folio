@@ -167,11 +167,12 @@ export function setTheme(t: "system" | "light" | "dark") {
   // Ease the light/dark change rather than flashing it (motion guidance on brightness jumps).
   const vt = (document as any).startViewTransition;
   if (vt && !reducedMotion()) vt.call(document, apply); else apply();
-  window.dispatchEvent(new Event("folio:theme"));
 }
 function applyTheme(t: "system" | "light" | "dark") {
   if (t === "system") { localStorage.removeItem("folio-theme"); delete document.documentElement.dataset.theme; }
   else { localStorage.setItem("folio-theme", t); document.documentElement.dataset.theme = t; }
+  // Announce only once the change has applied (it runs inside the cross-fade callback).
+  window.dispatchEvent(new Event("folio:theme"));
 }
 export function ThemeToggle() {
   const [t, setT] = useState(currentTheme);

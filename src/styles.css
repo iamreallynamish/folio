@@ -778,3 +778,12 @@ html[data-nav] .screen { animation: none; }
 .tour-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .tour-foot .btn { min-width: 76px; }
 @media (prefers-reduced-transparency: reduce) { .tour-veil { backdrop-filter: none; background: rgba(4, 4, 8, 0.9); } .tour-panel { background: var(--surface); backdrop-filter: none; } }
+
+/* Market watch: TradingView's symbol overview inside a Folio card. */
+.market-card { display: flex; flex-direction: column; }
+.market-frame { height: 380px; padding: 8px 6px 4px; border-radius: var(--r-l); background: var(--surface); box-shadow: var(--shadow-1); overflow: hidden; }
+.market-frame .tradingview-widget-container { height: 100%; display: flex; flex-direction: column; }
+.market-frame .tradingview-widget-container__widget { flex: 1; min-height: 0; }
+.tradingview-widget-copyright { font-size: 11px; line-height: 16px; padding: 4px 10px 2px; color: var(--label-3); text-align: right; }
+.tradingview-widget-copyright a { color: var(--label-2); }
+@media (max-width: 899px) { .market-frame { height: 340px; } }

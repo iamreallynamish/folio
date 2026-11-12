@@ -7,6 +7,7 @@ import { LogoMark } from "../ui/Logo.tsx";
 import { Empty, Skeleton, ThemeToggle, toast, useLoad, useMedia } from "../ui/kit.tsx";
 import { TxnRow } from "../ui/TxnRow.tsx";
 import { Reveal } from "../ui/Reveal.tsx";
+import TradingViewWidget from "@/components/TradingViewWidget";
 import { spring, SPRING, type SpringHandle } from "../ui/spring.ts";
 import { WalletCard } from "../ui/WalletCard.tsx";
 
@@ -182,6 +183,11 @@ export function Home() {
             <button className="btn small gray" onClick={markReviewed}>Mark reviewed</button>
           </section>
         )}
+
+        <section className="market-card" aria-label="Market watch">
+          <div className="between section-label"><span>Market watch</span><span className="caption faint">NSE · TradingView</span></div>
+          <div className="market-frame"><TradingViewWidget /></div>
+        </section>
 
       </div>
       </div>
