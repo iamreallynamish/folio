@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { api, type Account, type Category, type Txn, type User } from "./api.ts";
 import { Ctx, type Tab } from "./ctx.ts";
 import { Icon } from "./ui/Icon.tsx";
-import { LogoMark } from "./ui/Logo.tsx";
+import { LogoLoader, LogoMark } from "./ui/Logo.tsx";
+import { reducedMotion } from "./ui/spring.ts";
+import { Onboarding } from "./screens/Onboarding.tsx";
 import { ConfirmHost, ToastHost } from "./ui/kit.tsx";
 import { Auth } from "./screens/Auth.tsx";
 import { Home } from "./screens/Home.tsx";
@@ -17,6 +20,7 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "home", label: "Home", icon: "home" }, { id: "activity", label: "Activity", icon: "list" }, { id: "plan", label: "Plan", icon: "pie" },
   { id: "invest", label: "Invest", icon: "trend" }, { id: "ask", label: "Ask", icon: "spark" },
 ];
+const ORDER: Tab[] = ["home", "activity", "plan", "invest", "ask", "settings"];
 const tabFromHash = (): Tab => (["home", "activity", "plan", "invest", "ask", "settings"].includes(location.hash.slice(1)) ? (location.hash.slice(1) as Tab) : "home");
 
 export function App() {
@@ -31,7 +35,7 @@ export function App() {
 
   useEffect(() => {
     api("/me").then((r) => setUser(r.user)).catch(() => setUser(null));
-    const out = () => setUser(null), hash = () => setTab(tabFromHash());
+    const out = () => setUser(null), hash = () => goRef.current(tabFromHash());
     window.addEventListener("folio:signed-out", out);
     window.addEventListener("hashchange", hash);
     return () => { window.removeEventListener("folio:signed-out", out); window.removeEventListener("hashchange", hash); };
@@ -51,14 +55,36 @@ export function App() {
   }, [user?.id, version]);
 
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
-  const go = useCallback((t: Tab) => { location.hash = t; setTab(t); window.scrollTo({ top: 0 }); }, []);
+  /**
+   * Page changes slide in the direction of travel (left/right along the tab order) and cross-fade,
+   * using View Transitions so the old page animates out while the new one arrives.
+   * Tapping the current tab scrolls to the top, as on iOS.
+   */
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
+  const go = useCallback((t: Tab) => {
+    if (location.hash.slice(1) !== t) history.pushState(null, "", `#${t}`);
+    if (t === tabRef.current) { window.scrollTo({ top: 0, behavior: reducedMotion() ? "auto" : "smooth" }); return; }
+    const forward = ORDER.indexOf(t) > ORDER.indexOf(tabRef.current);
+    const swap = () => { flushSync(() => setTab(t)); window.scrollTo(0, 0); };
+    const vt = (document as any).startViewTransition;
+    if (!vt || reducedMotion()) return swap();
+    const root = document.documentElement;
+    root.dataset.nav = forward ? "forward" : "back";
+    vt.call(document, swap).finished.finally(() => { delete root.dataset.nav; });
+  }, []);
+  const goRef = useRef(go);
+  goRef.current = go;
   const ctx = useMemo(() => ({
     user: user!, setUser, version, refresh, accounts, categories, go,
     openTxn: setTxn, openImport: (text?: string) => setImporting({ text }), openAccount: setAccount,
   }), [user, version, refresh, accounts, categories, go]);
 
-  if (user === undefined) return <div className="auth"><LogoMark size={56} /></div>;
+  if (user === undefined) return <div className="auth" aria-busy="true"><LogoLoader size={72} /></div>;
   if (!user) return <><Auth onDone={(u) => { setUser(u); go("home"); }} /><ToastHost /></>;
+
+  // First sign-in: a short guided setup before the app.
+  if (!user.onboarded) return <Ctx.Provider value={ctx}><Onboarding /><ConfirmHost /><ToastHost /></Ctx.Provider>;
 
   const Screen = { home: Home, activity: Activity, plan: Plan, invest: Invest, ask: Assistant, settings: Settings }[tab];
   return (
@@ -66,14 +92,17 @@ export function App() {
       <div className="app">
         <nav className="sidebar" aria-label="Main">
           <div className="brand"><LogoMark size={30} />Folio</div>
-          {TABS.map((t) => <button key={t.id} className="side-link" aria-current={tab === t.id ? "page" : undefined} onClick={() => go(t.id)}><Icon name={t.icon} />{t.label === "Ask" ? "Assistant" : t.label}</button>)}
+          {TABS.map((t) => <button key={t.id} className="side-link" aria-current={tab === t.id ? "page" : undefined} onClick={() => go(t.id)}>{tab === t.id && <span className="side-pill" aria-hidden="true" />}<Icon name={t.icon} />{t.label === "Ask" ? "Assistant" : t.label}</button>)}
           <div style={{ flex: 1 }} />
-          <button className="side-link" aria-current={tab === "settings" ? "page" : undefined} onClick={() => go("settings")}><Icon name="gear" />Settings</button>
+          <button className="side-link" aria-current={tab === "settings" ? "page" : undefined} onClick={() => go("settings")}>{tab === "settings" && <span className="side-pill" aria-hidden="true" />}<Icon name="gear" />Settings</button>
         </nav>
         <main className="main" data-section={tab}><Screen key={tab} /></main>
         <nav className="tabbar" aria-label="Main">
-          {TABS.map((t) => <button key={t.id} className="tab" aria-current={tab === t.id ? "page" : undefined} onClick={() => go(t.id)}><Icon name={t.icon} />{t.label}</button>)}
+          {TABS.map((t) => <button key={t.id} className="tab" aria-current={tab === t.id ? "page" : undefined} onClick={() => go(t.id)}>{tab === t.id && <span className="tab-pill" aria-hidden="true" />}<Icon name={t.icon} />{t.label}</button>)}
         </nav>
+        {/* Progressive blur where content meets the screen edges and the floating tab bar. */}
+        <div className="edge-blur top" aria-hidden="true"><i /><i /><i /><i /></div>
+        <div className="edge-blur bottom" aria-hidden="true"><i /><i /><i /><i /></div>
       </div>
       {txn && <TxnSheet txn={txn} onClose={() => setTxn(null)} />}
       {importing && <ImportSheet initialText={importing.text} onClose={() => setImporting(null)} />}

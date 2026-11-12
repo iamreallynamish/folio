@@ -12,7 +12,7 @@ export function Settings() {
   const { user, setUser, accounts, categories, version, refresh, openAccount, openImport } = useApp();
   const [theme, setTheme_] = useState(localStorage.getItem("folio-theme") ?? "system");
   const [cat, setCat] = useState<Category | "new" | null>(null);
-  const [sheet, setSheet] = useState<"profile" | "password" | "market" | "ai" | "fx" | null>(null);
+  const [sheet, setSheet] = useState<"profile" | "password" | "market" | "ai" | "fx" | "categories" | null>(null);
   const rules = useLoad(() => api("/categories"), [version]);
   const fx = useLoad(() => api("/fx"), [version]);
 
@@ -77,33 +77,14 @@ export function Settings() {
 
       <div className="grid-2">
         <section>
-          <div className="section-label">Categories</div>
+          <div className="section-label">Organise</div>
           <div className="list">
-            {categories.map((c) => (
-              <button className="cell" key={c.id} onClick={() => setCat(c)}>
-                <span className="tx-icon" style={{ ["--tint" as any]: slotColor(c.slot), width: 30, height: 30, borderRadius: 8 }}><Icon name={c.icon} style={{ width: 17, height: 17 }} /></span>
-                <span className="grow truncate">{c.name}</span>
-                <span className="value subhead">{c.kind === "transfer" ? "Not spending" : c.budgetMinor != null ? formatMoney(c.budgetMinor, user.baseCurrency) : ""}</span>
-                <Icon name="chevron" className="chev" />
-              </button>
-            ))}
-            <button className="cell" style={{ color: "var(--accent)" }} onClick={() => setCat("new")}><Icon name="plus" style={{ width: 20, height: 20 }} />Add category</button>
+            <Row icon="pie" tint="var(--s5)" title="Categories and budgets" value={`${categories.length}`} onClick={() => setSheet("categories")} />
+            <Row icon="repeat" tint="var(--s3)" title="Learned merchants" value={`${rules.data?.rules.length ?? 0}`} onClick={() => setSheet("categories")} />
           </div>
         </section>
 
         <div className="stack" style={{ gap: 24 }}>
-          <section>
-            <div className="section-label">Learned merchants</div>
-            <div className="list">
-              {(rules.data?.rules ?? []).map((r: any) => (
-                <div className="cell" key={r.id}>
-                  <span className="grow"><span>{r.merchant}</span><span className="footnote muted" style={{ display: "block" }}>Always filed under {r.category}</span></span>
-                  <button className="icon-btn" aria-label={`Forget ${r.merchant}`} style={{ color: "var(--negative)" }} onClick={async () => { await api(`/rules/${r.id}`, { method: "DELETE" }); refresh(); toast("Rule removed"); }}><Icon name="trash" /></button>
-                </div>
-              ))}
-              {rules.data?.rules.length === 0 && <div className="cell subhead muted">When you correct a transaction's category, Folio remembers it for that merchant and lists it here.</div>}
-            </div>
-          </section>
           <section>
             <div className="section-label">Security and data</div>
             <div className="list">
@@ -117,7 +98,6 @@ export function Settings() {
         </div>
       </div>
 
-      <div className="stack" style={{ alignItems: "center", gap: 4, padding: "8px 0" }}><LogoMark size={28} /><span className="caption faint">Folio 0.1 · reviewed {fmtDate(user.lastReviewedAt)}</span></div>
 
       {cat && <CategorySheet category={cat} onClose={() => setCat(null)} />}
       {sheet === "profile" && <ProfileSheet onClose={() => setSheet(null)} />}
@@ -127,6 +107,7 @@ export function Settings() {
       {sheet === "ai" && <KeySheet field="anthropic" title="AI answers" has={user.hasAssistantKey} onClose={() => setSheet(null)}
         blurb="Without a key, the assistant answers common questions directly from your records. With an Anthropic API key, questions it cannot answer that way are sent to Claude together with a summary of your records (totals, recent transactions, income and holdings — never passwords, card numbers or the original bank messages). Those answers are labelled AI-generated. If Claude declines a request, the API retries it once on a fallback model." />}
       {sheet === "fx" && <FxSheet data={fx.data} onClose={() => setSheet(null)} />}
+      {sheet === "categories" && <CategoriesSheet rules={rules.data?.rules ?? []} onClose={() => setSheet(null)} onOpen={(c) => { setSheet(null); setTimeout(() => setCat(c), 260); }} />}
     </div>
   );
 }
@@ -198,6 +179,36 @@ function FxSheet({ data, onClose }: { data: any; onClose: () => void }) {
         <button className="btn tinted" disabled={!rate} onClick={add}>Set</button>
       </div>
       {error && <p className="error" role="alert">{error}</p>}
+    </Sheet>
+  );
+}
+
+/** Categories and the merchants Folio has learned, kept out of the main Settings list. */
+function CategoriesSheet({ rules, onClose, onOpen }: { rules: any[]; onClose: () => void; onOpen: (c: Category | "new") => void }) {
+  const { user, categories, refresh } = useApp();
+  return (
+    <Sheet title="Categories" cancelLabel="Done" onClose={onClose}>
+      <div className="list">
+        {categories.map((c) => (
+          <button className="cell" key={c.id} onClick={() => onOpen(c)}>
+            <span className="tx-icon" style={{ ["--tint" as any]: slotColor(c.slot), width: 30, height: 30 }}><Icon name={c.icon} style={{ width: 17, height: 17 }} /></span>
+            <span className="grow truncate">{c.name}</span>
+            <span className="value subhead">{c.kind === "transfer" ? "Not spending" : c.budgetMinor != null ? formatMoney(c.budgetMinor, user.baseCurrency) : ""}</span>
+            <Icon name="chevron" className="chev" />
+          </button>
+        ))}
+        <button className="cell" onClick={() => onOpen("new")}><Icon name="plus" style={{ width: 20, height: 20 }} />Add category</button>
+      </div>
+      <div className="section-label" style={{ paddingTop: 8 }}>Learned merchants</div>
+      <div className="list">
+        {rules.map((r: any) => (
+          <div className="cell" key={r.id}>
+            <span className="grow"><span>{r.merchant}</span><span className="footnote muted" style={{ display: "block" }}>Always filed under {r.category}</span></span>
+            <button className="icon-btn" aria-label={`Forget ${r.merchant}`} style={{ color: "var(--negative)" }} onClick={async () => { await api(`/rules/${r.id}`, { method: "DELETE" }); refresh(); toast("Rule removed"); }}><Icon name="trash" /></button>
+          </div>
+        ))}
+        {rules.length === 0 && <div className="cell subhead muted">When you change a transaction's category, Folio remembers the merchant and lists it here.</div>}
+      </div>
     </Sheet>
   );
 }

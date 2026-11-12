@@ -654,3 +654,106 @@ button, a, [role="button"], .cell, .chip, .tab { touch-action: manipulation; }
 .pay-card.art.peek .pc-hardware, .pay-card.art.peek .pc-vertical { visibility: hidden; }
 @media (max-width: 360px) { .pay-card.art .pc-money .meta { display: none; } }
 @media (max-width: 360px) { .pc-hardware { top: 43%; } .emv { width: 32px; height: 24px; } }
+
+/* ================= v5: navigation motion, edge blur, loader, setup ================= */
+/* Loader: two stars trade places (origin = the star's optical centre, 46/56 in the 100-unit box). */
+.logo-loader g { transform-box: view-box; transform-origin: 46px 56px; }
+.logo-loader .lm-big { animation: lm-recede 2.6s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate; }
+.logo-loader .lm-small { animation: lm-advance 2.6s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate; }
+@keyframes lm-recede {
+  0%, 14% { transform: none; opacity: 1; filter: none; }
+  86%, 100% { transform: translate(33px, -37px) scale(0.2) rotate(-25deg); opacity: 0.75; filter: blur(0.4px); }
+}
+@keyframes lm-advance {
+  0%, 14% { transform: translate(33px, -37px) scale(0.2) rotate(25deg); opacity: 0.75; filter: blur(0.4px); }
+  86%, 100% { transform: none; opacity: 1; filter: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logo-loader .lm-small { animation: none !important; transform: translate(33px, -37px) scale(0.2); }
+  .logo-loader .lm-big { animation: lm-pulse 1.6s ease-in-out infinite alternate !important; }
+  @keyframes lm-pulse { to { opacity: 0.6; } }
+}
+
+/* Page transitions: the outgoing page slips away, the new one arrives from the direction of travel. */
+.main { view-transition-name: page; }
+.tabbar { view-transition-name: tabbar; }
+.sidebar { view-transition-name: sidebar; }
+.tab-pill { view-transition-name: tab-pill; }
+.side-pill { view-transition-name: side-pill; }
+::view-transition-group(page) { animation-duration: 0.42s; }
+html[data-nav="forward"]::view-transition-old(page) { animation: page-out-left 0.16s cubic-bezier(0.4, 0, 1, 1) both; }
+html[data-nav="forward"]::view-transition-new(page) { animation: page-in-right 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.09s both; }
+html[data-nav="back"]::view-transition-old(page) { animation: page-out-right 0.16s cubic-bezier(0.4, 0, 1, 1) both; }
+html[data-nav="back"]::view-transition-new(page) { animation: page-in-left 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.09s both; }
+@keyframes page-out-left { to { opacity: 0; transform: translateX(-24px); } }
+@keyframes page-out-right { to { opacity: 0; transform: translateX(24px); } }
+@keyframes page-in-right { from { opacity: 0; transform: translateX(44px); } }
+@keyframes page-in-left { from { opacity: 0; transform: translateX(-44px); } }
+/* The active-tab pill glides between tabs (its position is morphed by the transition). */
+::view-transition-group(tab-pill), ::view-transition-group(side-pill) { animation-duration: 0.42s; animation-timing-function: cubic-bezier(0.2, 0.9, 0.25, 1.08); }
+html[data-nav] .screen { animation: none; }
+/* Screens no longer animate a transform on mount (only opacity), so nothing traps fixed overlays. */
+.screen { animation: page-fade 0.32s ease both; }
+@keyframes page-fade { from { opacity: 0; } }
+
+.tab { position: relative; background: none !important; }
+.tab > :not(.tab-pill) { position: relative; z-index: 1; }
+.tab-pill { position: absolute; inset: 0; border-radius: 24px; background: var(--fill-strong); }
+.side-link { position: relative; background: none; }
+.side-link[aria-current="page"] { background: none; }
+.side-link > :not(.side-pill) { position: relative; z-index: 1; }
+.side-pill { position: absolute; inset: 0; border-radius: 10px; background: var(--fill-strong); }
+
+/* Progressive blur: stacked layers, each blurrier and narrower, so content fades into the edge. */
+.edge-blur { position: fixed; left: 0; right: 0; pointer-events: none; z-index: 15; }
+.edge-blur.top { top: 0; height: calc(env(safe-area-inset-top) + 44px); }
+.edge-blur.bottom { bottom: 0; height: calc(env(safe-area-inset-bottom) + 112px); z-index: 19; }
+.edge-blur > i { position: absolute; inset: 0; }
+.edge-blur.top { background: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 70%, transparent), transparent); }
+.edge-blur.bottom { background: linear-gradient(to top, color-mix(in srgb, var(--bg) 55%, transparent), transparent); }
+.edge-blur.top > i:nth-child(1) { backdrop-filter: blur(1px); -webkit-backdrop-filter: blur(1px); mask: linear-gradient(to bottom, #000 0%, transparent 100%); }
+.edge-blur.top > i:nth-child(2) { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); mask: linear-gradient(to bottom, #000 0%, transparent 70%); }
+.edge-blur.top > i:nth-child(3) { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); mask: linear-gradient(to bottom, #000 0%, transparent 45%); }
+.edge-blur.top > i:nth-child(4) { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); mask: linear-gradient(to bottom, #000 0%, transparent 22%); }
+.edge-blur.bottom > i:nth-child(1) { backdrop-filter: blur(1px); -webkit-backdrop-filter: blur(1px); mask: linear-gradient(to top, #000 0%, transparent 100%); }
+.edge-blur.bottom > i:nth-child(2) { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); mask: linear-gradient(to top, #000 0%, transparent 70%); }
+.edge-blur.bottom > i:nth-child(3) { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); mask: linear-gradient(to top, #000 0%, transparent 45%); }
+.edge-blur.bottom > i:nth-child(4) { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); mask: linear-gradient(to top, #000 0%, transparent 25%); }
+@media (min-width: 900px) { .edge-blur.top { left: 248px; height: 36px; } .edge-blur.bottom { display: none; } }
+@media (prefers-reduced-transparency: reduce) { .edge-blur { display: none; } }
+
+/* Setup flow */
+.onboarding { min-height: 100dvh; display: flex; flex-direction: column; max-width: 520px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 8px) 20px calc(env(safe-area-inset-bottom) + 20px); }
+.ob-head { display: flex; align-items: center; justify-content: space-between; min-height: 52px; }
+.ob-head .btn svg { width: 16px; height: 16px; }
+.ob-dots { display: flex; gap: 6px; }
+.ob-dots i { width: 7px; height: 7px; border-radius: 4px; background: var(--fill-strong); transition: width 0.4s cubic-bezier(0.2, 0.9, 0.25, 1.1), background 0.3s; }
+.ob-dots i.done { background: var(--label-3); }
+.ob-dots i.on { width: 22px; background: var(--label); }
+.ob-body { flex: 1; padding-top: 28px; animation: ob-in-fwd 0.48s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.ob-body.back { animation-name: ob-in-back; }
+@keyframes ob-in-fwd { from { opacity: 0; transform: translateX(40px); } }
+@keyframes ob-in-back { from { opacity: 0; transform: translateX(-40px); } }
+.ob-center { display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 12vh; gap: 4px; }
+.ob-center .logo-loader { margin-bottom: 18px; }
+.ob-title { font-size: 30px; line-height: 36px; font-weight: 700; letter-spacing: -0.03em; }
+.ob-lede { margin-top: 10px; font-size: 17px; line-height: 24px; color: var(--label-2); max-width: 30em; }
+.ob-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 24px; }
+.ob-choice { min-height: 56px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow-1); font-size: 17px; font-weight: 600; transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s, color 0.2s; }
+.ob-choice:active { transform: scale(0.96); }
+.ob-choice[aria-checked="true"] { background: var(--label); color: var(--bg); }
+.ob-cards { display: flex; flex-direction: column; gap: 22px; margin-top: 22px; }
+.ob-card { display: flex; flex-direction: column; gap: 10px; transition: opacity 0.3s, filter 0.3s; }
+.ob-card.off .pay-card { opacity: 0.35; filter: grayscale(1); }
+.ob-amount { display: flex; align-items: baseline; gap: 10px; margin-top: 32px; padding: 18px 20px; border-radius: 20px; background: var(--surface); box-shadow: var(--shadow-1); }
+.ob-amount span { font-size: 17px; font-weight: 600; color: var(--label-2); }
+.ob-amount input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font: 700 40px/1.1 var(--font); letter-spacing: -0.03em; color: var(--label); }
+.ob-foot { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; }
+.ob-cta { min-height: 54px; border-radius: 18px; font-size: 17px; }
+.quick-pills { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 440px; width: 100%; margin: -6px auto 0; }
+.quick-pills button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 46px; border-radius: 23px; background: var(--surface); box-shadow: var(--shadow-1); font-weight: 600; font-size: 15px; transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s; }
+.quick-pills button:active { transform: scale(0.96); background: var(--fill-strong); }
+.quick-pills svg { width: 18px; height: 18px; }
+@media (min-width: 1100px) { .quick-pills { margin-left: 0; } }
+.visit-line { display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 14px; border-radius: var(--r-l); background: var(--surface); box-shadow: var(--shadow-1); }
+.visit-line > button.grow { display: flex; align-items: center; gap: 12px; text-align: left; min-width: 0; }

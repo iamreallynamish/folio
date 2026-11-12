@@ -11,7 +11,7 @@ const PROD = process.env.NODE_ENV === "production";
 export interface User {
   id: number; email: string; name: string; base_currency: string; monthly_budget_minor: number | null;
   alert_threshold: number; last_reviewed_at: string; av_key_enc: string | null; anthropic_key_enc: string | null;
-  ingest_token_hash: string | null; created_at: string; pass_hash: string;
+  ingest_token_hash: string | null; created_at: string; pass_hash: string; onboarded_at: string | null;
 }
 declare global { namespace Express { interface Request { user: User } } }
 
@@ -50,7 +50,7 @@ export function publicUser(u: User) {
   return {
     id: u.id, email: u.email, name: u.name, baseCurrency: u.base_currency, monthlyBudgetMinor: u.monthly_budget_minor,
     alertThreshold: u.alert_threshold, lastReviewedAt: u.last_reviewed_at,
-    hasMarketKey: !!u.av_key_enc, hasAssistantKey: !!u.anthropic_key_enc, hasIngestToken: !!u.ingest_token_hash,
+    hasMarketKey: !!u.av_key_enc, hasAssistantKey: !!u.anthropic_key_enc, hasIngestToken: !!u.ingest_token_hash, onboarded: !!u.onboarded_at,
   };
 }
 

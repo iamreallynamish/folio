@@ -18,7 +18,10 @@ export function Home() {
   const slots = useRef(new Map<number, HTMLDivElement>());
   const before = useRef<Map<number, number> | null>(null);
   const moving = useRef(new Map<number, SpringHandle>());
+  // The card-stack hint is shown until the stack has been used once.
+  const [hintSeen, setHintSeen] = useState(() => { try { return localStorage.getItem("folio-stack-hint") === "1"; } catch { return false; } });
   const bringForward = (id: number) => {
+    if (!hintSeen) { setHintSeen(true); try { localStorage.setItem("folio-stack-hint", "1"); } catch { /* private mode */ } }
     before.current = new Map([...slots.current].map(([k, el]) => [k, el.getBoundingClientRect().top]));
     setFront(id);
   };
@@ -102,14 +105,12 @@ export function Home() {
           })}
         </div>
         {cards.length === 0 && <div className="card"><Empty icon="card" title="No cards yet"><button className="btn tinted small" onClick={() => openAccount("new")}>Add a card</button></Empty></div>}
-        {stacked && cards.length > 1 && <p className="caption faint" style={{ textAlign: "center", marginTop: 10 }}>Tap a card behind to bring it forward</p>}
+        {stacked && cards.length > 1 && !hintSeen && <p className="caption faint" style={{ textAlign: "center", marginTop: 10 }}>Tap a card behind to bring it forward</p>}
       </section>
 
-      <nav className="quick" aria-label="Quick actions">
-        <button onClick={() => openTxn("new")}><span><Icon name="plus" /></span>Add</button>
-        <button onClick={() => openImport()}><span><Icon name="tray" /></span>Import</button>
-        <button onClick={() => go("plan")}><span><Icon name="pie" /></span>Budget</button>
-        <button onClick={() => go("ask")}><span><Icon name="spark" /></span>Ask</button>
+      <nav className="quick-pills" aria-label="Quick actions">
+        <button onClick={() => openTxn("new")}><Icon name="plus" />Add</button>
+        <button onClick={() => openImport()}><Icon name="tray" />Import</button>
       </nav>
 
       {wallets.length > 0 && (
@@ -165,29 +166,21 @@ export function Home() {
       {standing.length > 0 && <div className="list">{standing.map(changeRow)}</div>}
 
       <div>
-        <section aria-label="Since your last visit">
-          <div className="between section-label">
-            <span className="row" style={{ gap: 8 }}>Since last visit{!caughtUp && <span className="count-pill">{v.count}</span>}</span>
-            {!caughtUp && <button className="btn plain small" style={{ minHeight: 24 }} onClick={markReviewed}>Mark reviewed</button>}
-          </div>
-          {caughtUp ? (
-            <div className="list"><div className="cell">
-              <span className="tx-icon" style={{ ["--tint" as any]: "var(--accent)" }}><Icon name="check" /></span>
-              <span className="grow"><span className="headline">You're all caught up</span><span className="footnote muted" style={{ display: "block" }}>Nothing new since you last reviewed, {relTime(v.since)}.</span></span>
-            </div></div>
-          ) : (
-            <>
-              <p className="footnote muted" style={{ padding: "0 4px 10px", marginTop: -6 }}>
-                {v.totals.map((t: any) => [t.spentMinor !== 0 && `${formatMoney(t.spentMinor, t.currency)} spent`, t.inMinor > 0 && `${formatMoney(t.inMinor, t.currency)} in`, t.movedMinor > 0 && `${formatMoney(t.movedMinor, t.currency)} moved`].filter(Boolean).join(" · ")).join(" · ")} · last reviewed {relTime(v.since)}
-              </p>
-              <div className="list">
-                {freshChanges.map(changeRow)}
-                {v.transactions.slice(0, 5).map((t: any) => <TxnRow key={t.id} t={t} onClick={() => openTxn(t)} />)}
-                {v.count > 5 && <button className="cell more" onClick={() => go("activity")}>Show all {v.count} new transactions<Icon name="chevron" className="chev" /></button>}
-              </div>
-            </>
-          )}
-        </section>
+        {!caughtUp && (
+          // One compact line: new items are marked with a dot in Latest Transactions above.
+          <section className="visit-line" aria-label="Since your last visit">
+            <button className="grow" onClick={() => go("activity")}>
+              <span className="count-pill">{v.count}</span>
+              <span className="grow" style={{ minWidth: 0 }}>
+                <span className="headline" style={{ display: "block" }}>New since {relTime(v.since)}</span>
+                <span className="footnote muted truncate" style={{ display: "block" }}>
+                  {[...v.totals.map((t: any) => [t.spentMinor !== 0 && `${formatMoney(t.spentMinor, t.currency)} spent`, t.inMinor > 0 && `${formatMoney(t.inMinor, t.currency)} in`, t.movedMinor > 0 && `${formatMoney(t.movedMinor, t.currency)} moved`].filter(Boolean).join(" · ")), freshChanges.length ? `${freshChanges.length} balance update${freshChanges.length > 1 ? "s" : ""}` : ""].filter(Boolean).join(" · ")}
+                </span>
+              </span>
+            </button>
+            <button className="btn small gray" onClick={markReviewed}>Mark reviewed</button>
+          </section>
+        )}
 
       </div>
       </div>

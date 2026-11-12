@@ -37,6 +37,7 @@ core.patch("/me", h(async (req, res) => {
   const th = b.alertThreshold !== undefined ? Math.min(100, Math.max(50, Math.round(Number(b.alertThreshold)) || 80)) : u.alert_threshold;
   const name = b.name !== undefined ? String(b.name).trim().slice(0, 60) || bad("Enter your name.") : u.name;
   await run("UPDATE users SET name=?, base_currency=?, monthly_budget_minor=?, alert_threshold=? WHERE id=?", name, base, budget, th, u.id);
+  if (b.onboarded === true && !u.onboarded_at) await run("UPDATE users SET onboarded_at=? WHERE id=?", now(), u.id);
   res.json({ user: publicUser(await userRow(u.id)) });
 }));
 core.put("/me/keys", h(async (req, res) => {

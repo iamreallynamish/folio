@@ -19,8 +19,10 @@ const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL, pass_hash TEXT NOT NULL,
   base_currency TEXT NOT NULL DEFAULT 'JPY', monthly_budget_minor BIGINT, alert_threshold INTEGER NOT NULL DEFAULT 80,
-  last_reviewed_at TEXT COLLATE "C" NOT NULL, av_key_enc TEXT, anthropic_key_enc TEXT, ingest_token_hash TEXT, created_at TEXT COLLATE "C" NOT NULL
+  last_reviewed_at TEXT COLLATE "C" NOT NULL, av_key_enc TEXT, anthropic_key_enc TEXT, ingest_token_hash TEXT, created_at TEXT COLLATE "C" NOT NULL,
+  onboarded_at TEXT COLLATE "C"
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarded_at TEXT COLLATE "C";
 CREATE TABLE IF NOT EXISTS sessions (
   token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   expires_at TEXT COLLATE "C" NOT NULL, created_at TEXT COLLATE "C" NOT NULL
@@ -93,7 +95,11 @@ CREATE INDEX IF NOT EXISTS txn_account ON transactions(account_id);
 CREATE INDEX IF NOT EXISTS txn_transfer_account ON transactions(transfer_account_id);
 CREATE INDEX IF NOT EXISTS txn_category ON transactions(category_id);
 `;
-const SCHEMA_MARKER = "txn_category";
+/**
+ * Detects whether the newest schema change is already in place (one query on a warm database).
+ * When adding to SCHEMA, write the change idempotently and point this check at it.
+ */
+const SCHEMA_CHECK = "SELECT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass('public.users') AND attname = 'onboarded_at' AND NOT attisdropped) AS t";
 const TABLES = ["users", "sessions", "accounts", "categories", "merchant_rules", "transactions", "seen_sms", "fx_rates", "income_sources", "income_payments", "holdings", "market_cache", "rate_hits"];
 /**
  * Supabase exposes the public schema through its Data API. Row-level security with no policies
@@ -171,9 +177,8 @@ async function init(): Promise<Driver> {
   if (!url && process.env.VERCEL) throw new ConfigError("DATABASE_URL is not set. Add your Supabase Transaction pooler string in Vercel → Project → Settings → Environment Variables, then redeploy.");
   if (url && /\[YOUR-PASSWORD\]/i.test(url)) throw new ConfigError("DATABASE_URL still contains [YOUR-PASSWORD]. Replace it, including the brackets, with your database password.");
   const d = url ? await postgresDriver(url) : await pgliteDriver();
-  // One round trip on a warm database: skip setup when the newest schema object already exists.
-  // (Update SCHEMA_MARKER whenever the schema gains objects.)
-  const present = (await d.base.query(`SELECT to_regclass('public.${SCHEMA_MARKER}') AS t`, [])).rows[0]?.t;
+  // One round trip on a warm database: skip setup when the newest schema change is present.
+  const present = (await d.base.query(SCHEMA_CHECK, [])).rows[0]?.t;
   if (!present) {
     // A second round trip only on first setup; the advisory lock serialises instances starting together.
     await d.script(`BEGIN;\nSELECT pg_advisory_xact_lock(727274);\n${SCHEMA}\n${LOCKDOWN}\nCOMMIT;`);

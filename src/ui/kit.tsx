@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { project, reducedMotion, rubberband, spring, SPRING, VelocityTracker, type SpringHandle } from "./spring.ts";
 import { Icon } from "./Icon.tsx";
 
@@ -108,7 +109,8 @@ export function Sheet({ title, onClose, children, action, cancelLabel = "Cancel"
     else animateTo(0, velocity);
   };
 
-  return (
+  // Rendered at the document root: an animated ancestor would otherwise trap a fixed overlay inside it.
+  return createPortal(
     <div className="sheet-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
       <div className="scrim" ref={backdrop} aria-hidden="true" />
       <div className={`sheet ${variant === "action" ? "action" : ""}`} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref} style={{ outline: "none" }}>
@@ -121,7 +123,8 @@ export function Sheet({ title, onClose, children, action, cancelLabel = "Cancel"
         ) : <div className="sheet-grab" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} />}
         <div className="sheet-body">{typeof children === "function" ? children(() => close()) : children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
