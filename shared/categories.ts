@@ -27,4 +27,5 @@ export const DEFAULT_CATEGORIES: CategoryDef[] = [
   { key: "uncategorised", name: "Uncategorised", icon: "question", slot: 0, kind: "expense" },
   { key: "topup", name: "Stored-value top-up", icon: "wallet", slot: 0, kind: "transfer" },
   { key: "transfer", name: "Transfer", icon: "swap", slot: 0, kind: "transfer" },
+  { key: "cash", name: "Cash withdrawal", icon: "wallet", slot: 0, kind: "transfer" },
 ];

@@ -228,3 +228,37 @@ test("earlier imports left uncategorised are re-read on the next import", async 
   assert.equal(fixed.needsReview, false);
   assert.match(fixed.categoryName, /^Groceries/);
 });
+
+test("cash withdrawals: chosen by hand or converted, never counted as spending, never learned", async () => {
+  const spent = async () => (await D("GET", "/budget?month=2026-11")).body.summary.spent;
+  const before = await spent();
+  const axis = (await D("GET", "/accounts")).body.accounts.find((a: any) => a.last4 === "7117");
+  // Chosen by hand
+  const w = await D("POST", "/transactions", { cashWithdrawal: true, amount: "10000", currency: "JPY", date: "2026-11-03", accountId: axis.id });
+  assert.equal(w.status, 201);
+  assert.equal(w.body.transaction.type, "transfer");
+  assert.equal(w.body.transaction.categoryKey, "cash");
+  assert.equal(w.body.transaction.categoryName, "Cash withdrawal");
+  assert.equal(w.body.transaction.transferName, "Cash");
+  assert.equal(w.body.transaction.merchant, "Cash withdrawal");
+  assert.equal(await spent(), before, "a withdrawal is not spending");
+  // Converted from a purchase (e.g. an ATM inside a 7-Eleven recorded as 7-Eleven)
+  const p = await D("POST", "/transactions", { type: "expense", amount: "5000", currency: "JPY", date: "2026-11-04", merchant: "7-Eleven", accountId: axis.id });
+  assert.equal(await spent(), before + 5000);
+  const c = await D("PATCH", `/transactions/${p.body.transaction.id}`, { cashWithdrawal: true });
+  assert.equal(c.body.transaction.categoryKey, "cash");
+  assert.equal(await spent(), before, "converting removes it from spending");
+  // …and 7-Eleven purchases are still groceries afterwards.
+  const next = await D("POST", "/transactions", { type: "expense", amount: "300", currency: "JPY", date: "2026-11-05", merchant: "7-Eleven", accountId: axis.id });
+  assert.match(next.body.transaction.categoryName, /^Groceries/);
+  // An imported ATM message lands in the same place.
+  const imp = (await D("POST", "/sms/import", { text: "JPY 20000 using Axis Bank Credit Card no. XX7117 on 06-11-26 11:00:00 IST at SEVEN BANK ATM." })).body;
+  assert.equal(imp.items[0].category, "Cash withdrawal");
+  assert.equal(await spent(), before + 300);
+});
+
+test("a purchase typed in at an ATM is recorded as a withdrawal", async () => {
+  const r = await D("POST", "/transactions", { type: "expense", amount: "3000", currency: "JPY", date: "2026-11-07", merchant: "Seven Bank ATM" });
+  assert.equal(r.body.transaction.type, "transfer");
+  assert.equal(r.body.transaction.categoryKey, "cash");
+});

@@ -135,7 +135,7 @@ function findInstrument(text: string): string | undefined {
   return undefined;
 }
 
-const STOP = String.raw`(?=\s+on\s+\d|\s+dated\b|\s+at\s+\d|\s*[.;(]|\s+via\b|\s+using\b|\s+ref\b|\s+upi\b|\s+avl\b|\s+avbl\b|\s+available\b|\s+bal\b|\s+txn\b|\s+-\s+|$)`;
+const STOP = String.raw`(?=\s+on\s+\d|\s+dated\b|\s+at\s+\d|\s*[;(]|\.(?:\s|$)|\s+\.|\s+via\b|\s+using\b|\s+ref\b|\s+upi\b|\s+avl\b|\s+avbl\b|\s+available\b|\s+bal\b|\s+txn\b|\s+-\s+|$)`;
 function cleanMerchant(s: string | undefined): string | undefined {
   if (!s) return undefined;
   const t = s.replace(/\s+/g, " ").replace(/^[\s:,-]+|[\s:,.-]+$/g, "").trim();
@@ -213,7 +213,10 @@ export function parseSms(input: string, fallbackDate?: string): ParsedSms {
   // "debited from your a/c … credited to X" is a debit; credit only when no debit wording.
   const isCredit = hasCredit && !/\bdebited\b/i.test(raw) && !(hasDebit && !REFUND_RE.test(raw) && !/\bcredited\b/i.test(raw));
   const rawMerchant = findMerchant(raw, isCredit);
-  const merchant = rawMerchant ? identifyMerchant(rawMerchant) : undefined;
+  let merchant = rawMerchant ? identifyMerchant(rawMerchant) : undefined;
+  // "withdrawn at ATM", "cash withdrawal of …": cash taken out, whatever the terminal is called.
+  if (!isCredit && (/\b(cash\s+withdrawal|withdrawn|withdrawal|atm\s+wdl|cash\s+wdl)\b/i.test(raw) || /\bATM\b/.test(raw)) && merchant?.wallet !== "Cash")
+    merchant = identifyMerchant("CASH WITHDRAWAL");
 
   let type: TxnType = isCredit ? (REFUND_RE.test(raw) ? "refund" : "income") : "expense";
   if (!isCredit && merchant && merchant.kind !== "expense") type = "transfer";

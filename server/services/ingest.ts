@@ -3,6 +3,7 @@ import { all, get, run, insert, now, tx } from "../db.js";
 import { sha256 } from "../crypto.js";
 import { parseSms, normaliseSms, type ParsedSms } from "../../shared/sms.js";
 import { merchantKey } from "../../shared/merchants.js";
+import { DEFAULT_CATEGORIES } from "../../shared/categories.js";
 
 export interface IncomingSms { text: string; date?: string }
 export type ItemStatus = "new" | "duplicate" | "ignored" | "balance";
@@ -35,6 +36,12 @@ export async function findDuplicate(userId: number, fp: string, time: string | n
 
 export async function categoryByKey(userId: number, key: string): Promise<{ id: number; name: string }> {
   let c = await get<{ id: number; name: string }>("SELECT id, name FROM categories WHERE user_id = ? AND key = ?", userId, key);
+  // A built-in category added after this account was created (e.g. Cash withdrawal): add it now.
+  const def = DEFAULT_CATEGORIES.find((d) => d.key === key);
+  if (!c && def && key !== "uncategorised") {
+    const id = await insert("INSERT INTO categories(user_id,key,name,icon,slot,kind) VALUES (?,?,?,?,?,?)", userId, def.key, def.name, def.icon, def.slot, def.kind);
+    return { id, name: def.name };
+  }
   if (!c && key !== "uncategorised") return categoryByKey(userId, "uncategorised");
   if (!c) {
     const id = await insert("INSERT INTO categories(user_id,key,name,icon,slot,kind) VALUES (?,?,?,?,?,?)", userId, "uncategorised", "Uncategorised", "question", 0, "expense");

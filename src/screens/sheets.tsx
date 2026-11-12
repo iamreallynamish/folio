@@ -9,7 +9,9 @@ import { Field, Notice, Segmented, Sheet, toast, useLoad, useSheetClose, confirm
 import { Icon } from "../ui/Icon.tsx";
 import { WalletCard } from "../ui/WalletCard.tsx";
 
-const TYPES = [{ value: "expense", label: "Expense" }, { value: "refund", label: "Refund" }, { value: "income", label: "Money in" }, { value: "transfer", label: "Transfer" }] as const;
+const TYPES = [{ value: "expense", label: "Expense" }, { value: "refund", label: "Refund" }, { value: "income", label: "Money in" }, { value: "transfer", label: "Transfer" }, { value: "withdrawal", label: "Cash" }] as const;
+/** Cash taken out of an ATM: stored as a transfer into the Cash wallet, so it is never counted as spending. */
+const isCash = (t: Txn | null) => !!t && t.type === "transfer" && t.categoryKey === "cash";
 
 // ---------------------------------------------------------------- transaction
 export function TxnSheet({ txn, onClose }: { txn: Txn | "new"; onClose: () => void }) {
@@ -19,7 +21,7 @@ export function TxnSheet({ txn, onClose }: { txn: Txn | "new"; onClose: () => vo
   // Existing: details first. New: amount keypad first, then details.
   const [mode, setMode] = useState<"view" | "amount" | "edit">(t ? "view" : "amount");
   const [f, setF] = useState({
-    type: t?.type ?? "expense", amount: t ? String(fromMinor(t.amountMinor, t.currency)) : "", currency: t?.currency ?? user.baseCurrency,
+    type: (isCash(t) ? "withdrawal" : t?.type ?? "expense") as string, amount: t ? String(fromMinor(t.amountMinor, t.currency)) : "", currency: t?.currency ?? user.baseCurrency,
     merchant: t?.merchant ?? "", date: t?.date ?? todayIso(), time: t?.time?.slice(0, 5) ?? "", categoryId: t?.categoryId ? String(t.categoryId) : "",
     accountId: t?.accountId ? String(t.accountId) : accounts.length === 1 ? String(accounts[0].id) : "", transferAccountId: t?.transferAccountId ? String(t.transferAccountId) : "", note: t?.note ?? "",
   });
@@ -31,7 +33,8 @@ export function TxnSheet({ txn, onClose }: { txn: Txn | "new"; onClose: () => vo
   const sources = useLoad(() => (t?.type === "income" && !t.incomeLinked ? api("/income") : Promise.resolve({ sources: [] })), [t?.id]);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });
   const cats = categories.filter((c) => (f.type === "transfer" ? c.kind === "transfer" : c.kind === "expense"));
-  const categoryChanged = !!t && f.categoryId !== "" && Number(f.categoryId) !== t.categoryId && f.type !== "income";
+  const cash = f.type === "withdrawal";
+  const categoryChanged = !!t && !cash && f.categoryId !== "" && Number(f.categoryId) !== t.categoryId && f.type !== "income";
   const dec = decimals(f.currency);
   const amountOk = Number(f.amount) > 0;
   // Typed amount with thousands separators, keeping a trailing decimal point while typing.
@@ -49,15 +52,19 @@ export function TxnSheet({ txn, onClose }: { txn: Txn | "new"; onClose: () => vo
   }
   async function save(force = false) {
     setBusy(true); setError(""); setDup(false);
-    const body: any = { type: f.type, amount: f.amount, currency: f.currency, merchant: f.merchant, date: f.date, time: f.time || null, note: f.note, accountId: f.accountId ? Number(f.accountId) : null };
-    if (f.type === "transfer") body.transferAccountId = f.transferAccountId ? Number(f.transferAccountId) : null;
-    // Leave the category to Folio on a new entry unless the user picked one.
-    if (f.type !== "income" && (t || f.categoryId)) body.categoryId = f.categoryId ? Number(f.categoryId) : null;
+    const body: any = { type: cash ? "transfer" : f.type, amount: f.amount, currency: f.currency, merchant: f.merchant, date: f.date, time: f.time || null, note: f.note, accountId: f.accountId ? Number(f.accountId) : null };
+    if (cash) body.cashWithdrawal = true;
+    else {
+      if (f.type === "transfer") body.transferAccountId = f.transferAccountId ? Number(f.transferAccountId) : null;
+      // Leave the category to Folio on a new entry unless the user picked one.
+      if (f.type !== "income" && (t || f.categoryId)) body.categoryId = f.categoryId ? Number(f.categoryId) : null;
+    }
     if (categoryChanged) body.learn = learn;
     if (force) body.force = true;
     try {
       const r = await api(t ? `/transactions/${t.id}` : "/transactions", { method: t ? "PATCH" : "POST", body });
-      toast(t ? (r.alsoUpdated ? `Saved. ${r.alsoUpdated} more from ${f.merchant} updated.` : "Saved") : `Added to ${r.transaction.categoryName ?? "your activity"}`);
+      toast(t ? (r.alsoUpdated ? `Saved. ${r.alsoUpdated} more from ${f.merchant} updated.` : "Saved")
+        : r.transaction.categoryKey === "cash" ? "Cash withdrawal added · not counted as spending" : `Added to ${r.transaction.categoryName ?? "your activity"}`);
       refresh(); sheet.dismiss();
     } catch (e: any) {
       if (e instanceof ApiError && e.status === 409) setDup(true);
@@ -68,6 +75,13 @@ export function TxnSheet({ txn, onClose }: { txn: Txn | "new"; onClose: () => vo
     try {
       const r = await api(`/transactions/${t!.id}`, { method: "PATCH", body: { categoryId: id } });
       toast(r.alsoUpdated ? `Moved, with ${r.alsoUpdated} more from ${t!.merchant}` : `Moved. Folio will remember ${t!.merchant}.`);
+      refresh(); sheet.dismiss();
+    } catch (e: any) { setError(e.message); }
+  }
+  async function markCash() {
+    try {
+      await api(`/transactions/${t!.id}`, { method: "PATCH", body: { cashWithdrawal: true } });
+      toast("Marked as a cash withdrawal · not counted as spending");
       refresh(); sheet.dismiss();
     } catch (e: any) { setError(e.message); }
   }
@@ -92,7 +106,7 @@ export function TxnSheet({ txn, onClose }: { txn: Txn | "new"; onClose: () => vo
   // ---------- details (read) ----------
   if (t && mode === "view") {
     const tint = t.type === "income" || t.type === "refund" ? "var(--positive)" : slotColor(t.type === "transfer" ? 0 : t.categorySlot);
-    const status = { expense: "Spent", refund: "Refunded", income: t.incomeLinked ? "Income received" : "Money in", transfer: "Moved · not counted as spending" }[t.type];
+    const status = isCash(t) ? "Cash withdrawal · not counted as spending" : { expense: "Spent", refund: "Refunded", income: t.incomeLinked ? "Income received" : "Money in", transfer: "Moved · not counted as spending" }[t.type];
     const rows: [string, string | null][] = [
       ["Status", status], ["Where", t.merchant], ["Date", `${fmtDate(t.date, { weekday: "short", day: "numeric", month: "long", year: "numeric" })}${t.dateInferred ? " (assumed)" : ""}`],
       ["Time", t.time ? `${t.time.slice(0, 5)}${t.tz ? ` ${t.tz}` : ""}` : null], [t.type === "transfer" ? "Route" : "Paid with", txnCard(t)],
@@ -115,6 +129,7 @@ export function TxnSheet({ txn, onClose }: { txn: Txn | "new"; onClose: () => vo
           <div>
             <div className="footnote muted" style={{ padding: "0 4px 8px" }}>Wrong category? Pick one and Folio remembers it for {t.merchant}.</div>
             <div className="chips">{cats.filter((c) => c.id !== t.categoryId).map((c) => <button key={c.id} className="chip" onClick={() => recategorise(c.id)}><Icon name={c.icon} style={{ width: 14, height: 14, color: slotColor(c.slot) }} />{c.name}</button>)}</div>
+            {t.type === "expense" && <button className="btn plain small" style={{ marginTop: 8 }} onClick={markCash}><Icon name="wallet" />This was a cash withdrawal</button>}
           </div>
         )}
         {t.type === "income" && !t.incomeLinked && (sources.data?.sources.length ?? 0) > 0 && (
@@ -139,7 +154,7 @@ export function TxnSheet({ txn, onClose }: { txn: Txn | "new"; onClose: () => vo
   // ---------- new: amount keypad ----------
   if (mode === "amount") {
     const acct = accounts.find((a) => String(a.id) === f.accountId);
-    const go = (type: "expense" | "income" | "transfer") => { setF({ ...f, type, categoryId: "" }); setMode("edit"); };
+    const go = (type: "expense" | "income" | "transfer" | "withdrawal") => { setF({ ...f, type, categoryId: "", merchant: type === "withdrawal" && !f.merchant ? "Cash withdrawal" : f.merchant }); setMode("edit"); };
     return (
       <Sheet closeRef={sheet.ref} title="New transaction" onClose={onClose}>
         <div className="keypad-amount">
@@ -159,7 +174,10 @@ export function TxnSheet({ txn, onClose }: { txn: Txn | "new"; onClose: () => vo
           ))}
         </div>
         <div className="duo"><button className="btn gray" disabled={!amountOk} onClick={() => go("income")}>Money in</button><button className="btn primary" disabled={!amountOk} onClick={() => go("expense")}>Spent</button></div>
-        <button className="btn plain small" disabled={!amountOk} onClick={() => go("transfer")}>Transfer or top-up instead</button>
+        <div className="row" style={{ justifyContent: "center", gap: 4 }}>
+          <button className="btn plain small" disabled={!amountOk} onClick={() => go("withdrawal")}>Cash withdrawal</button>
+          <button className="btn plain small" disabled={!amountOk} onClick={() => go("transfer")}>Transfer or top-up</button>
+        </div>
       </Sheet>
     );
   }
@@ -169,23 +187,23 @@ export function TxnSheet({ txn, onClose }: { txn: Txn | "new"; onClose: () => vo
     <Sheet closeRef={sheet.ref} title={t ? "Edit transaction" : "Details"} onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} disabled={busy} onClick={() => save()}>{t ? "Save" : "Add"}</button>}>
       <button className="detail-hero" onClick={() => !t && setMode("amount")} disabled={!!t} aria-label="Change amount">
         <div className="amount-xl">{shown}</div>
-        <div className="footnote muted">{TYPES.find((x) => x.value === f.type)?.label}{!t ? " · tap to change amount" : ""}</div>
+        <div className="footnote muted">{cash ? "Cash withdrawal" : TYPES.find((x) => x.value === f.type)?.label}{!t ? " · tap to change amount" : ""}</div>
       </button>
       <Segmented label="Type" value={f.type} onChange={(type) => setF({ ...f, type, categoryId: "" })} options={TYPES as any} />
       <div className="list rows">
         {t && <label className="cell"><span>Amount</span><span className="row" style={{ gap: 6 }}><input className="num" inputMode="decimal" value={f.amount} onChange={set("amount")} aria-label="Amount" /><select value={f.currency} onChange={set("currency")} aria-label="Currency">{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select></span></label>}
-        <label className="cell"><span>{f.type === "income" ? "From" : f.type === "transfer" ? "Description" : "Merchant"}</span><input value={f.merchant} onChange={set("merchant")} placeholder={f.type === "transfer" ? "Mobile Suica top-up" : "Starbucks"} autoFocus={!t} /></label>
+        <label className="cell"><span>{f.type === "income" ? "From" : f.type === "transfer" || cash ? "Description" : "Merchant"}</span><input value={f.merchant} onChange={set("merchant")} placeholder={cash ? "Cash withdrawal" : f.type === "transfer" ? "Mobile Suica top-up" : "Starbucks"} autoFocus={!t} /></label>
         <label className="cell"><span>Date</span><input type="date" value={f.date} onChange={set("date")} /></label>
         <label className="cell"><span>Time{t?.tz ? ` (${t.tz})` : ""}</span><input type="time" value={f.time} onChange={set("time")} /></label>
       </div>
       {t?.dateInferred && <Notice>The bank message had no date, so the day it was imported was used. Check it.</Notice>}
       <div className="list rows">
-        {f.type !== "income" && (
+        {f.type !== "income" && !cash && (
           <label className="cell"><span>Category</span>
             <select value={f.categoryId} onChange={set("categoryId")}><option value="">{t ? "No category" : "Automatic"}</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
           </label>
         )}
-        <label className="cell"><span>{f.type === "transfer" ? "From" : f.type === "income" || f.type === "refund" ? "Into" : "Paid with"}</span>
+        <label className="cell"><span>{cash ? "Withdrawn from" : f.type === "transfer" ? "From" : f.type === "income" || f.type === "refund" ? "Into" : "Paid with"}</span>
           <select value={f.accountId} onChange={set("accountId")}><option value="">Not specified</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{a.last4 ? ` ••${a.last4}` : ""}</option>)}</select>
         </label>
         {f.type === "transfer" && (
@@ -195,6 +213,7 @@ export function TxnSheet({ txn, onClose }: { txn: Txn | "new"; onClose: () => vo
         )}
         <label className="cell"><span>Note</span><input value={f.note} onChange={set("note")} placeholder="Optional" /></label>
       </div>
+      {cash && <p className="caption faint" style={{ padding: "0 4px", marginTop: -8 }}>Cash withdrawals move money from your card into your Cash wallet and are not counted as spending. What you buy with the cash can be added as separate expenses.</p>}
       {f.type === "transfer" && <p className="caption faint" style={{ padding: "0 4px", marginTop: -8 }}>Transfers and top-ups move money and are not counted as spending. Record what you spend from the wallet as separate expenses.</p>}
       {categoryChanged && (
         <label className="row footnote" style={{ gap: 10, padding: "0 4px" }}>

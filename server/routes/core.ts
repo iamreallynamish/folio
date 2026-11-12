@@ -5,7 +5,7 @@ import { encrypt, randomToken, sha256 } from "../crypto.js";
 import { CURRENCIES, convertMinor, toMinor } from "../../shared/money.js";
 import { identifyMerchant, merchantKey } from "../../shared/merchants.js";
 import { messagesFromFile, splitMessages } from "../../shared/sms.js";
-import { fingerprint, findDuplicate, importMessages, previewMessages, resolveCategory, type IncomingSms } from "../services/ingest.js";
+import { categoryByKey, ensureWallet, fingerprint, findDuplicate, importMessages, previewMessages, resolveCategory, type IncomingSms } from "../services/ingest.js";
 import { incomeSummary, monthComparison, monthSummary, rates, recurring, thisMonth, today, userRow } from "../services/summary.js";
 
 export const h = (fn: (req: Request, res: Response) => unknown) => (req: Request, res: Response, next: NextFunction) =>
@@ -161,7 +161,7 @@ core.patch("/categories/:id", h(async (req, res) => {
 }));
 core.delete("/categories/:id", h(async (req, res) => {
   const c = await owned("categories", req.params.id, req.user.id);
-  if (["uncategorised", "topup", "transfer"].includes(c.key)) bad("This category is needed by Folio and cannot be deleted.");
+  if (["uncategorised", "topup", "transfer", "cash"].includes(c.key)) bad("This category is needed by Folio and cannot be deleted.");
   const fallback = await get<{ id: number }>("SELECT id FROM categories WHERE user_id = ? AND key = 'uncategorised'", req.user.id);
   await tx(async () => {
     await run("UPDATE transactions SET category_id = ?, needs_review = 1 WHERE user_id = ? AND category_id = ?", fallback?.id ?? null, req.user.id, c.id);
@@ -189,7 +189,7 @@ core.delete("/fx/:currency", h(async (req, res) => { await run("DELETE FROM fx_r
 
 // ---------- transactions ----------
 const TXN_SELECT = `
-  SELECT t.*, c.name AS category_name, c.icon AS category_icon, c.slot AS category_slot,
+  SELECT t.*, c.key AS category_key, c.name AS category_name, c.icon AS category_icon, c.slot AS category_slot,
          a.name AS account_name, a.last4 AS account_last4, w.name AS transfer_name
   FROM transactions t
   LEFT JOIN categories c ON c.id = t.category_id
@@ -198,7 +198,7 @@ const TXN_SELECT = `
 export function txnOut(t: any, user: User, recurringKeys: Set<string>) {
   return {
     id: t.id, type: t.type, amountMinor: t.amount_minor, currency: t.currency, date: t.date, time: t.time, tz: t.tz, dateInferred: !!t.date_inferred,
-    merchant: t.merchant, rawDescriptor: t.raw_descriptor, categoryId: t.category_id, categoryName: t.category_name, categoryIcon: t.category_icon,
+    merchant: t.merchant, rawDescriptor: t.raw_descriptor, categoryId: t.category_id, categoryKey: t.category_key, categoryName: t.category_name, categoryIcon: t.category_icon,
     categorySlot: t.category_slot, subcategory: t.subcategory, accountId: t.account_id, accountName: t.account_name, last4: t.account_last4,
     transferAccountId: t.transfer_account_id, transferName: t.transfer_name, paymentMethod: t.payment_method, note: t.note, source: t.source,
     needsReview: !!t.needs_review, createdAt: t.created_at, isNew: t.created_at > user.last_reviewed_at, recurring: recurringKeys.has(t.merchant_key),
@@ -224,7 +224,10 @@ core.get("/transactions", h(async (req, res) => res.json({ transactions: await q
 
 async function txnFields(req: Request, prev?: any) {
   const b = req.body, uid = req.user.id;
-  const type = b.type ?? prev?.type ?? "expense";
+  // A cash withdrawal moves money from the card into the Cash wallet; it is not spending.
+  let cash = b.cashWithdrawal === true;
+  if (cash) { b.type = "transfer"; if (!b.merchant && !prev?.merchant) b.merchant = "Cash withdrawal"; }
+  let type = b.type ?? prev?.type ?? "expense";
   if (!["expense", "income", "refund", "transfer"].includes(type)) bad("Unknown transaction type.");
   const currency = b.currency !== undefined ? ccy(b.currency) : prev?.currency ?? req.user.base_currency;
   const amountMinor = b.amount !== undefined ? amount(b.amount, currency) : prev?.amount_minor ?? bad("Enter an amount.");
@@ -233,6 +236,8 @@ async function txnFields(req: Request, prev?: any) {
   const merchantRaw = b.merchant !== undefined ? String(b.merchant).trim().slice(0, 80) : prev?.merchant;
   if (!merchantRaw) bad("Enter a merchant or description.");
   const ident = identifyMerchant(merchantRaw);
+  // A new "expense" at an ATM ("Seven Bank ATM") is a withdrawal, as it would be from a bank message.
+  if (!prev && !cash && type === "expense" && ident.wallet === "Cash" && b.categoryId === undefined) { cash = true; type = "transfer"; }
   const key = b.merchant !== undefined ? ident.key || merchantKey(merchantRaw) : prev.merchant_key;
   const accountId = b.accountId !== undefined ? (b.accountId ? (await owned("accounts", b.accountId, uid)).id : null) : prev?.account_id ?? null;
   const transferId = type === "transfer" ? (b.transferAccountId !== undefined ? (b.transferAccountId ? (await owned("accounts", b.transferAccountId, uid)).id : null) : prev?.transfer_account_id ?? null) : null;
@@ -243,9 +248,14 @@ async function txnFields(req: Request, prev?: any) {
     else { const c = await resolveCategory(uid, key, type === "transfer" ? (ident.kind === "topup" ? "topup" : "transfer") : ident.category); categoryId = c.id; subcategory = c.learned ? null : ident.subcategory ?? null; }
   }
   if (b.subcategory !== undefined) subcategory = String(b.subcategory ?? "").trim().slice(0, 50) || null;
+  let toId = transferId;
+  if (cash) {
+    categoryId = (await categoryByKey(uid, "cash")).id; subcategory = null;
+    toId = (await ensureWallet(uid, "Cash", currency)).id;
+  }
   const last4 = accountId ? (await get<{ last4: string | null }>("SELECT last4 FROM accounts WHERE id = ?", accountId))?.last4 : null;
   return {
-    type, currency, amountMinor, date, time, merchant: b.merchant !== undefined && ident.known ? ident.name : merchantRaw, key, accountId, transferId, categoryId, subcategory,
+    type, currency, amountMinor, date, time, merchant: b.merchant !== undefined && ident.known ? ident.name : merchantRaw, key, accountId, transferId: toId, categoryId, subcategory,
     note: b.note !== undefined ? String(b.note ?? "").trim().slice(0, 300) || null : prev?.note ?? null,
     fp: fingerprint({ last4, accountId, amountMinor, currency, date, merchantKey: key, type }),
   };
@@ -272,7 +282,8 @@ core.patch("/transactions/:id", h(async (req, res) => {
     await run(`UPDATE transactions SET account_id=?, transfer_account_id=?, type=?, amount_minor=?, currency=?, date=?, time=?, merchant=?, merchant_key=?, category_id=?, subcategory=?, note=?, fingerprint=?, needs_review=0, updated_at=? WHERE id=?`,
       f.accountId, f.transferId, f.type, f.amountMinor, f.currency, f.date, f.time, f.merchant, f.key, f.categoryId, f.subcategory, f.note, f.fp, now(), prev.id);
     // Learn from a category correction so the same merchant is filed correctly next time.
-    if (f.categoryId && f.categoryId !== prev.category_id && req.body.learn !== false && f.key && f.type !== "income") {
+    // A one-off cash withdrawal says nothing about the merchant (an ATM inside a 7-Eleven), so it is never learned.
+    if (f.categoryId && f.categoryId !== prev.category_id && req.body.learn !== false && !req.body.cashWithdrawal && f.key && f.type !== "income") {
       await run("INSERT INTO merchant_rules(user_id,merchant_key,merchant,category_id,created_at) VALUES (?,?,?,?,?) ON CONFLICT(user_id,merchant_key) DO UPDATE SET category_id=excluded.category_id, merchant=excluded.merchant",
         req.user.id, f.key, f.merchant, f.categoryId, now());
       if (req.body.applyToAll !== false)

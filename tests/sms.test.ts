@@ -173,3 +173,32 @@ test("misspelled and cut-off merchant names are recognised; lookalikes are not",
   for (const raw of ["MOTION GYM", "TOKYO", "SMITH M", "SEVEN", "MOBILE", "STEAMY HOT POT", "LIFESTYLE CO", "GRABBER", "ANAND SWEETS"])
     assert.equal(identifyMerchant(raw).known, false, raw);
 });
+
+test("dotted merchant names: AMAZON.CO.JP and WWW.AMAZON.CO.JP are Amazon", () => {
+  for (const m of [
+    "JPY 2480 using Axis Bank Credit Card no. XX7117 on 02-11-26 10:15:00 IST at WWW.AMAZON.CO.JP",
+    "JPY 2,480 using Axis Bank Credit Card no. XX7117 on 02-11-26 10:15:00 IST at \nAMAZON.CO.JP.",
+    "JPY 1,299.00 has been made using your ICICI Bank Forex Prepaid Card XX0817 at AMAZON.CO.JP on 02-Nov-2026 . Current available balance on your Forex Prepaid Card is JPY 77,087.00 0.",
+    "JPY 899 Axis Bank Card no. XX7117 02-11-26 10:15:00 IST AMAZON.CO.JP",
+  ]) {
+    const p = parseSms(m);
+    assert.equal(p.merchant?.name, "Amazon", m);
+    assert.equal(p.merchant?.category, "shopping");
+  }
+});
+
+test("ATM withdrawals are cash moved to the Cash wallet, not spending", () => {
+  for (const m of [
+    "JPY 10,000 withdrawn at ATM using ICICI Bank Forex Prepaid Card XX0817 on 03-Nov-2026. Bal JPY 67,087.00",
+    "JPY 10000 using Axis Bank Credit Card no. XX7117 on 03-11-26 11:00:00 IST at SEVEN BANK ATM.",
+    "JPY 10,000.00 has been made using your ICICI Bank Forex Prepaid Card XX0817 at ATM on 03-Nov-2026 . Current available balance on your Forex Prepaid Card is JPY 67,087.00",
+  ]) {
+    const p = parseSms(m);
+    assert.equal(p.type, "transfer", m);
+    assert.equal(p.merchant?.name, "Cash withdrawal");
+    assert.equal(p.merchant?.category, "cash");
+    assert.equal(p.merchant?.wallet, "Cash");
+  }
+  // Seven Bank is the ATM network, not 7-Eleven the shop.
+  assert.equal(identifyMerchant("SEVEN BANK").name, "Cash withdrawal");
+});

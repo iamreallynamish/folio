@@ -30,7 +30,11 @@ interface Entry { name: string; aliases: string[]; category: string; subcategory
 const E = (name: string, aliases: string[], category: string, subcategory?: string): Entry => ({ name, aliases, category, subcategory });
 const W = (name: string, aliases: string[]): Entry => ({ name, aliases, category: "topup", kind: "topup", wallet: name });
 
+/** Cash from an ATM: money moved from the card into your Cash wallet, not spent (spend it as separate expenses). */
+const CASH: Entry = { name: "Cash withdrawal", aliases: ["ATM", "CASH WITHDRAWAL", "CASH WDL", "SEVEN BANK", "AEON BANK", "YUCHO", "JP BANK", "E NET", "ENET ATM", "LAWSON BANK"], category: "cash", kind: "transfer", wallet: "Cash" };
+
 const ENTRIES: Entry[] = [
+  CASH,
   // Stored-value wallets and transit cards: money moved, not yet spent
   W("Mobile Suica", ["MOBILE SUICA", "SUICA", "MOBILESUICA"]),
   W("PASMO", ["PASMO", "MOBILE PASMO"]),
@@ -256,7 +260,7 @@ const ENTRIES: Entry[] = [
 
 /** Patterns the alias table can't express (wording rather than a name). Checked first. */
 const PATTERNS: { re: RegExp; entry: Entry }[] = [
-  { re: /\b(atm|cash)\s*(wdl|withdrawal|w\/d)\b|\batm\b.*\bwithdr/i, entry: { name: "ATM withdrawal", aliases: [], category: "transfer", kind: "transfer", wallet: "Cash" } },
+  { re: /\b(atm|cash)\s*(wdl|withdrawal|w\/d)\b|\batm\b.*\bwithdr|\bwithdr[a-z]*\b.*\batm\b/i, entry: CASH },
   { re: /\bamazon\s*pay\s*(balance|add|top)/i, entry: W("Amazon Pay balance", []) },
   { re: /\bapple\.com\/bill\b/i, entry: E("Apple", [], "subscriptions") },
   { re: /\b(pharmacy|drug\s*store|clinic|hospital|dental)\b/i, entry: E("", [], "health", "Pharmacy") },
