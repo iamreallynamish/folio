@@ -6,6 +6,7 @@ import { Icon } from "../ui/Icon.tsx";
 import { LogoMark } from "../ui/Logo.tsx";
 import { Empty, Skeleton, ThemeToggle, toast, useLoad, useMedia } from "../ui/kit.tsx";
 import { TxnRow } from "../ui/TxnRow.tsx";
+import { Reveal } from "../ui/Reveal.tsx";
 import { spring, SPRING, type SpringHandle } from "../ui/spring.ts";
 import { WalletCard } from "../ui/WalletCard.tsx";
 
@@ -59,7 +60,7 @@ export function Home() {
       </div>
       <div>
         <div className="eyebrow hide-desktop">{new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</div>
-        <h1 className="greeting">{greeting}, <span>{first}</span></h1>
+        <h1 className="greeting"><Reveal text={`${greeting}, `} once="greeting" /><Reveal text={first} className="name" delay={0.12} once="greeting-name" /></h1>
       </div>
     </header>
   );

@@ -1,0 +1,8 @@
+/* Tailwind for shadcn-style components. Preflight (Tailwind's reset) is deliberately left out so it
+   cannot restyle Folio's existing elements; only the theme tokens and utility classes are loaded. */
+@layer theme, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@source "./components";
+@source "./screens";
+@source "./ui";

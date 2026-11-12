@@ -24,17 +24,15 @@ export function WalletCard({ account, onClick, peek = false }: { account: Accoun
       <CardArt theme={a.theme} />
       <div className="pc-top">
         <div className="pc-brand">
-          <div className="bank wordmark-type">{a.theme === "axis-privilege" ? (a.bank ?? a.name).toUpperCase() : a.bank ?? a.name}</div>
+          <div className="bank">{a.bank ?? a.name}</div>
           <div className="type">{type}</div>
         </div>
         {peek ? <span className={`pc-peek num ${has ? "" : "none"}`}>{has ? bal : "Unavailable"}</span>
           : a.theme === "axis-privilege" ? <span className="pc-tier">PRIVILEGE</span> : <span className="pc-mark"><LogoMark size={20} mono /></span>}
       </div>
       <div className="pc-hardware" aria-hidden="true"><Chip /><Icon name="wave" className="pc-wave" /></div>
-      {a.theme === "axis-privilege" && <span className="pc-vertical" aria-hidden="true">Credit Card</span>}
       <div className="pc-foot">
         <div className="pc-money">
-          <div className="bal-label">{a.theme === "axis-privilege" ? "Available credit" : "Available balance"}</div>
           <div className={`bal ${has ? "" : "none"}`}>{bal}</div>
           <div className="meta">{updated}</div>
         </div>

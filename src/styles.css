@@ -416,7 +416,7 @@ body { background: var(--glow) no-repeat fixed, var(--bg); }
 .home-head { display: flex; flex-direction: column; gap: 18px; padding-top: 10px; }
 .wordmark { display: flex; align-items: center; gap: 8px; font: 700 20px var(--font-round); letter-spacing: -0.03em; }
 .greeting { font-size: 26px; line-height: 31px; font-weight: 700; letter-spacing: -0.035em; color: var(--label-2); margin-top: 3px; }
-.greeting span { color: var(--label); }
+.greeting .name, .greeting > span:last-child { color: var(--label); }
 @media (min-width: 900px) { .home-head { padding-top: 26px; flex-direction: column-reverse; gap: 2px; } .greeting { font-size: 32px; line-height: 38px; } }
 
 /* floating tab bar */
@@ -635,7 +635,6 @@ button, a, [role="button"], .cell, .chip, .tab { touch-action: manipulation; }
 .pay-card > .pc-art { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
 .pay-card.art > :not(.pc-art) { z-index: 2; }
 .pay-card.art .bank { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
-.pay-card.axis-privilege .bank { letter-spacing: 0.14em; font-size: 15px; font-weight: 800; }
 .pay-card.art .type { opacity: 0.86; font-weight: 500; }
 .pc-tier { font-size: 13px; font-weight: 800; font-style: italic; letter-spacing: 0.08em; }
 .pc-hardware { position: absolute; left: 20px; right: 20px; top: 38%; display: flex; justify-content: space-between; align-items: center; transform: translateY(-50%); pointer-events: none; }

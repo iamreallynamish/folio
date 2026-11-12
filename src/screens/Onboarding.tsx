@@ -7,6 +7,7 @@ import { Icon } from "../ui/Icon.tsx";
 import { LogoLoader } from "../ui/Logo.tsx";
 import { toast } from "../ui/kit.tsx";
 import { WalletCard } from "../ui/WalletCard.tsx";
+import { Reveal } from "../ui/Reveal.tsx";
 
 const COMMON = ["JPY", "INR", "USD", "EUR", "GBP", "SGD"];
 const STEPS = 5;
@@ -59,12 +60,12 @@ export function Onboarding() {
     // 0 — welcome
     <div className="ob-center" key="0">
       <LogoLoader size={92} />
-      <h1 className="ob-title">Welcome, {first}</h1>
+      <Reveal as="h1" className="ob-title" text={`Welcome, ${first}`} />
       <p className="ob-lede">A minute of setup and Folio will be ready for your first bank message.</p>
     </div>,
     // 1 — currency
     <div key="1">
-      <h1 className="ob-title">Which currency do you budget in?</h1>
+      <Reveal as="h1" className="ob-title" text={`Which currency do you budget in?`} />
       <p className="ob-lede">Spending in other currencies is kept separate unless you set an exchange rate later.</p>
       <div className="ob-grid" role="radiogroup" aria-label="Budget currency">
         {COMMON.map((c) => <button key={c} role="radio" aria-checked={currency === c} className="ob-choice" onClick={() => setCurrency(c)}>{c}</button>)}
@@ -77,7 +78,7 @@ export function Onboarding() {
     </div>,
     // 2 — cards
     <div key="2">
-      <h1 className="ob-title">Your cards</h1>
+      <Reveal as="h1" className="ob-title" text={`Your cards`} />
       <p className="ob-lede">Folio matches bank messages to these by their last four digits. Remove any that aren't yours.</p>
       <div className="ob-cards">
         {cards.length === 0 && <p className="subhead muted">No cards yet. You can add them in Settings.</p>}
@@ -94,7 +95,7 @@ export function Onboarding() {
     </div>,
     // 3 — budget
     <div key="3">
-      <h1 className="ob-title">Set a monthly budget?</h1>
+      <Reveal as="h1" className="ob-title" text={`Set a monthly budget?`} />
       <p className="ob-lede">Folio shows what's left each month and warns you as you get close. You can change it any time.</p>
       <label className="ob-amount">
         <span>{currency}</span>
@@ -103,7 +104,7 @@ export function Onboarding() {
     </div>,
     // 4 — first data
     <div key="4">
-      <h1 className="ob-title">Bring in your spending</h1>
+      <Reveal as="h1" className="ob-title" text={`Bring in your spending`} />
       <p className="ob-lede">Paste bank SMS messages and Folio reads the amount, merchant, card and balance. Nothing is read without you pasting or sharing it.</p>
       <div className="list" style={{ marginTop: 18 }}>
         <button className="cell" disabled={busy} onClick={() => finish("paste")}><span className="tx-icon" style={{ ["--tint" as any]: "var(--s3)" }}><Icon name="tray" /></span><span className="grow"><span className="headline" style={{ display: "block" }}>Paste bank messages</span><span className="footnote muted">Copy them from Messages</span></span><Icon name="chevron" className="chev" /></button>
