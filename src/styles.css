@@ -826,14 +826,14 @@ h1.text-reveal { font-size: 32px; font-weight: 600; letter-spacing: -0.05em; }
 .ascii-bg {
   position: fixed; inset: 0; width: 100vw; height: 100dvh; z-index: 0; pointer-events: none;
   opacity: 0.16;
-  /* clear of the sidebar and the left of the content; full strength from the middle rightwards */
-  -webkit-mask-image: linear-gradient(90deg, transparent 22%, #000 55%);
-          mask-image: linear-gradient(90deg, transparent 22%, #000 55%);
+  /* the chart flows the full width after the sidebar, appearing at the right and fading at the far left */
+  -webkit-mask-image: linear-gradient(90deg, transparent 260px, #000 440px, #000 calc(100% - 24px), transparent);
+          mask-image: linear-gradient(90deg, transparent 260px, #000 440px, #000 calc(100% - 24px), transparent);
   animation: ascii-in 1.6s ease both;
 }
 @keyframes ascii-in { from { opacity: 0; } }
 @media (max-width: 899px) {
-  .ascii-bg { opacity: 0.12; -webkit-mask-image: linear-gradient(180deg, transparent 18%, #000 70%); mask-image: linear-gradient(180deg, transparent 18%, #000 70%); }
+  .ascii-bg { opacity: 0.12; -webkit-mask-image: linear-gradient(90deg, transparent, #000 15%, #000 90%, transparent); mask-image: linear-gradient(90deg, transparent, #000 15%, #000 90%, transparent); }
 }
 :root[data-theme="light"] .ascii-bg { opacity: 0.09; }
 @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .ascii-bg { opacity: 0.09; } }
