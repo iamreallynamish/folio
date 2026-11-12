@@ -4,8 +4,9 @@ import { useApp } from "../ctx.ts";
 import { Icon } from "../ui/Icon.tsx";
 import { LogoMark } from "../ui/Logo.tsx";
 import { Provenance } from "../ui/kit.tsx";
+import { TypeIn } from "../ui/Reveal.tsx";
 
-interface Msg { role: "user" | "assistant"; text: string; answer?: any }
+interface Msg { role: "user" | "assistant"; text: string; answer?: any; fresh?: boolean }
 const SUGGESTIONS = ["How much did I spend this month?", "Which merchants do I spend the most with?", "Where does my money go?", "How much scholarship money have I received?", "Am I within budget?", "How are my investments performing?"];
 
 export function Assistant() {
@@ -15,7 +16,7 @@ export function Assistant() {
   const [busy, setBusy] = useState(false);
   const [ai, setAi] = useState(false);
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => { sessionStorage.setItem("folio-chat", JSON.stringify(msgs.slice(-30))); end.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [msgs, busy]);
+  useEffect(() => { sessionStorage.setItem("folio-chat", JSON.stringify(msgs.slice(-30).map(({ fresh, ...m }) => m))); end.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [msgs, busy]);
 
   async function ask(question: string) {
     if (!question.trim() || busy) return;
@@ -24,7 +25,7 @@ export function Assistant() {
     setInput(""); setBusy(true);
     try {
       const { answer } = await api("/assistant", { body: { question, history, ai } });
-      setMsgs((m) => [...m, { role: "assistant", text: answer.text, answer }]);
+      setMsgs((m) => [...m.map((x) => ({ ...x, fresh: false })), { role: "assistant", text: answer.text, answer, fresh: true }]);
     } catch (e: any) {
       setMsgs((m) => [...m, { role: "assistant", text: e.message, answer: { provenance: "none" } }]);
     } finally { setBusy(false); }
@@ -49,7 +50,7 @@ export function Assistant() {
         {msgs.map((m, i) => m.role === "user" ? <div key={i} className="bubble me text">{m.text}</div> : (
           <div key={i} className="bubble bot">
             {m.answer && m.answer.provenance !== "none" && <div><Provenance kind={m.answer.provenance} /></div>}
-            <div className="text">{m.text}</div>
+            {m.fresh ? <TypeIn text={m.text} /> : <div className="text">{m.text}</div>}
             {m.answer?.facts?.length > 0 && <dl className="facts">{m.answer.facts.map((f: any, j: number) => <div key={j} style={{ display: "contents" }}><dt>{f.label}</dt><dd>{f.value}</dd></div>)}</dl>}
             {m.answer?.note && <div className="caption faint" style={{ whiteSpace: "normal" }}>{m.answer.note}</div>}
             {m.answer?.provenance === "none" && !user.hasAssistantKey && m.answer?.suggestions && <button className="btn plain small" style={{ alignSelf: "flex-start", padding: 0 }} onClick={() => go("settings")}>Open Settings</button>}

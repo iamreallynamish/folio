@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api, type User } from "../api.ts";
 import { CURRENCIES } from "../../shared/money.ts";
 import { AppIcon } from "../ui/Logo.tsx";
+import { Reveal } from "../ui/Reveal.tsx";
 import { Field, Segmented } from "../ui/kit.tsx";
 
 export function Auth({ onDone }: { onDone: (u: User) => void }) {
@@ -22,7 +23,7 @@ export function Auth({ onDone }: { onDone: (u: User) => void }) {
       <form className="auth-card" onSubmit={submit}>
         <div className="brand">
           <AppIcon />
-          <h1 className="large-title" style={{ fontSize: 44, lineHeight: "48px" }}>Your money, <span className="grad">understood.</span></h1>
+          <h1 className="large-title" style={{ fontSize: 44, lineHeight: "48px" }}><Reveal text="Your money, " /><Reveal text="understood." className="grad-words" delay={0.18} /></h1>
           <p className="muted subhead">Spending, budgets, income and investments,<br />built from your own records.</p>
         </div>
         <Segmented label="Sign in or create account" value={mode} onChange={(m) => { setMode(m); setError(""); }} options={[{ value: "login", label: "Sign in" }, { value: "register", label: "Create account" }]} />

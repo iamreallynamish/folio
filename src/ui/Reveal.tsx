@@ -20,3 +20,15 @@ export function Reveal({ text, as = "span", className, delay = 0, once }: { text
   if (reduce || !play) { const Tag = as; return <Tag className={className}>{text}</Tag>; }
   return <TextEffect per="word" as={as} preset="blur" delay={delay} className={className}>{text}</TextEffect>;
 }
+
+/** An answer written in quickly, word by word (fast enough that long answers stay readable). */
+export function TypeIn({ text }: { text: string }) {
+  const reduce = useReducedMotion();
+  if (reduce) return <div className="text">{text}</div>;
+  return (
+    <TextEffect per="word" as="div" className="text" variants={{
+      container: { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: Math.min(0.03, 1.2 / Math.max(1, text.split(/\s+/).length)) } } },
+      item: { hidden: { opacity: 0, y: 4, filter: "blur(4px)" }, visible: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.25 } } },
+    }}>{text}</TextEffect>
+  );
+}
