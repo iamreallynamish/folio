@@ -88,7 +88,7 @@ export function App() {
   goRef.current = go;
   const ctx = useMemo(() => ({
     user: user!, setUser, version, refresh, accounts, categories, go, tab,
-    startTour: () => { go("home"); setTimeout(() => setTour({ mode: "replay", start: 1 }), 350); },
+    startTour: () => { go("home"); setTimeout(() => setTour({ mode: "replay", start: 0 }), 350); },
     openTxn: setTxn, openImport: (text?: string) => setImporting({ text }), openAccount: setAccount,
   }), [user, version, refresh, accounts, categories, go, tab]);
 

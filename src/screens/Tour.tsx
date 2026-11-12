@@ -30,7 +30,7 @@ type Rect = { top: number; left: number; width: number; height: number; radius: 
 export function Tour({ mode, start, onClose }: { mode: "first" | "replay"; start: number; onClose: () => void }) {
   const { user, setUser, go, tab, openImport } = useApp();
   const first = user.name.split(" ")[0];
-  const [phase, setPhase] = useState<"welcome" | "tour" | "done">(mode === "first" && start === 0 ? "welcome" : "tour");
+  const [phase, setPhase] = useState<"welcome" | "tour" | "done">(start === 0 ? "welcome" : "tour");
   const [step, setStep] = useState(Math.min(Math.max(start - 1, 0), STEPS.length - 1));
   const [ready, setReady] = useState(false); // welcome: Start Setup shown after 5 s
   const [rect, setRect] = useState<Rect | null>(null);

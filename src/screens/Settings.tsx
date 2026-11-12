@@ -82,7 +82,7 @@ export function Settings() {
           <div className="list">
             <Row icon="pie" tint="var(--s5)" title="Categories and budgets" value={`${categories.length}`} onClick={() => setSheet("categories")} />
             <Row icon="repeat" tint="var(--s3)" title="Learned merchants" value={`${rules.data?.rules.length ?? 0}`} onClick={() => setSheet("categories")} />
-            <Row icon="spark" tint="var(--s1)" title="Replay the tour" onClick={startTour} />
+            <Row icon="spark" tint="var(--s1)" title="Replay setup" onClick={startTour} />
           </div>
         </section>
 
