@@ -1,12 +1,13 @@
 /**
  * Motion for the whole app (motion/react, per the Motion skill's React rules):
  *  - enterScreen: a page's sections cascade in when it opens, then the visible list rows.
- *  - CountUp: key amounts count to their value instead of snapping.
+ *  - CountUp: key amounts rise in character by character on first open, then count between values.
  * Transform + opacity only (GPU-accelerated); no overshoot — this is a finance app.
  * Under Reduce Motion, content fades without moving, and numbers appear at their final value.
  */
 import { animate, stagger } from "motion/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { TextReveal } from "@/components/ui/text-reveal-animation";
 import { reducedMotion } from "./spring.ts";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
@@ -57,38 +58,50 @@ export function enterScreen(screen: HTMLElement) {
  */
 const entered = new Set<string>();
 export function useScreenEntrance(main: React.RefObject<HTMLElement | null>, key: string) {
-  useEffect(() => {
+  // Layout effect: runs before the new screen's first paint, so its placeholders never flash.
+  useLayoutEffect(() => {
     const root = main.current;
     // Once per screen per visit: returning to a screen just slides it in, with no second cascade.
-    if (!root || entered.has(key)) return;
+    if (!root || entered.has(key)) { if (root) { delete root.dataset.entering; delete root.dataset.entered; } return; }
     entered.add(key);
+    delete root.dataset.entered;
+    root.dataset.entering = "";
     let done = false;
+    const reveal = () => { delete root.dataset.entering; };
     const tryEnter = () => {
       if (done) return;
       const screen = root.querySelector<HTMLElement>(":scope > .screen");
       if (!screen || screen.querySelector(".skeleton") || screen.children.length < 2) return;
       done = true;
       obs.disconnect();
-      enterScreen(screen);
+      enterScreen(screen); // hides the blocks first…
+      root.dataset.entered = "";
+      reveal(); // …then shows the screen, in the same frame
     };
     // MutationObserver callbacks run before the next paint, so content never flashes before animating.
     const obs = new MutationObserver(tryEnter);
     obs.observe(root, { childList: true, subtree: true });
     tryEnter();
+    // A slow connection: show the loading placeholders after a moment rather than an empty page.
+    const slow = setTimeout(reveal, 900);
     const t = setTimeout(() => { done = true; obs.disconnect(); }, 3000);
-    return () => { obs.disconnect(); clearTimeout(t); };
+    return () => { obs.disconnect(); clearTimeout(t); clearTimeout(slow); reveal(); };
   }, [key]);
 }
 
 /** Last shown value per number, so a remount doesn't count up from zero again. */
 const shown = new Map<string, number>();
-/** A number that counts to its value: from 0 the first time it's seen in a visit, then from its last value. */
+/**
+ * A key amount. The first time it appears in a visit its characters rise into place (TextReveal);
+ * after that, when the value changes, it counts from the old value to the new one.
+ */
 export function CountUp({ value, format, className, id }: { value: number; format: (v: number) => string; className?: string; id: string }) {
+  const [first] = useState(() => !shown.has(id));
   const ref = useRef<HTMLSpanElement>(null);
-  const prev = useRef(shown.get(id) ?? 0);
+  const prev = useRef(shown.get(id) ?? value);
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el) { prev.current = value; shown.set(id, value); return; }
     if (reducedMotion() || prev.current === value) { el.textContent = format(value); prev.current = value; shown.set(id, value); return; }
     const controls = animate(prev.current, value, {
       duration: 0.9, ease: EASE,
@@ -99,5 +112,6 @@ export function CountUp({ value, format, className, id }: { value: number; forma
     return () => controls.stop();
   }, [value]);
   // The final value is in the DOM from the start (for screen readers and if JS animation is skipped).
+  if (first && prev.current === value) return <TextReveal as="span" word={format(value)} className={className} delay={0.12} step={0.03} />;
   return <span ref={ref} className={className}>{format(value)}</span>;
 }

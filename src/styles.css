@@ -790,3 +790,20 @@ html[data-nav] .screen { animation: none; }
 /* A frame whose page isn't declared dark is painted opaque white inside a dark page; matching its
    colour scheme lets TradingView's transparent background show through. */
 .market-frame iframe { color-scheme: light; background: transparent; }
+
+/* ---------- TextReveal: characters rise into place (numbers on first open) ---------- */
+.text-reveal { display: inline-flex; overflow: hidden; vertical-align: bottom; padding-block: 0.08em; margin-block: -0.08em; }
+h1.text-reveal { font-size: 32px; font-weight: 600; letter-spacing: -0.05em; }
+.text-reveal > span {
+  display: inline-block; opacity: 0;
+  animation: text-reveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: calc(var(--delay, 0s) + var(--step, 0.02s) * var(--index));
+}
+@keyframes text-reveal { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.text-reveal-replay { width: 100%; margin-top: 24px; height: 32px; font-size: 14px; padding-inline: 12px; font-weight: 500; border-radius: 9999px; color: var(--bg); background: var(--label); }
+@media (prefers-reduced-motion: reduce) { .text-reveal > span { animation: none; opacity: 1; } }
+
+/* The first time a screen opens it stays hidden until its data is in, then cascades once —
+   no fade-in of placeholders followed by a second entrance. */
+.main[data-entering] > .screen { opacity: 0; animation: none; }
+.main[data-entered] > .screen { animation: none; }
