@@ -5,6 +5,7 @@ import { dayLabel, formatMoney } from "../format.ts";
 import { Icon } from "../ui/Icon.tsx";
 import { Empty, Field, Skeleton, useLoad } from "../ui/kit.tsx";
 import { TxnRow } from "../ui/TxnRow.tsx";
+import { Reveal } from "../ui/Reveal.tsx";
 
 const TYPES = [["", "All"], ["expense", "Expenses"], ["income", "Money in"], ["refund", "Refunds"], ["transfer", "Transfers"], ["review", "To review"]];
 
@@ -38,7 +39,7 @@ export function Activity() {
   return (
     <div className="screen" style={{ gap: 14 }}>
       <header className="screen-head">
-        <h1 className="large-title">Activity</h1>
+        <Reveal as="h1" className="large-title" text="Activity" />
         <div className="actions">
           <button className="icon-btn" aria-label="Import bank messages" onClick={() => openImport()}><Icon name="tray" /></button>
           <button className="icon-btn" aria-label="Add transaction" onClick={() => openTxn("new")}><Icon name="plus" /></button>

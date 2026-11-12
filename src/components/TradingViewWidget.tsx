@@ -5,7 +5,8 @@ import { currentTheme } from "../ui/kit.tsx";
  * TradingView "Symbol Overview" embed. Market data and charts come from TradingView;
  * their attribution link must stay. Re-created when Folio switches between light and dark.
  */
-function TradingViewWidget({ symbols = [["NSE:APOLLO|1M"], ["NSE:PERSISTENT|1D"]] }: { symbols?: string[][] }) {
+// TradingView's free embeds refuse NSE symbols (exchange licensing); the BSE listings of the same companies chart fine.
+function TradingViewWidget({ symbols = [["BSE:APOLLO|1M"], ["BSE:PERSISTENT|1D"]] }: { symbols?: string[][] }) {
   const container = useRef<HTMLDivElement>(null);
   const [theme, setTheme] = useState(currentTheme);
 
@@ -69,9 +70,9 @@ function TradingViewWidget({ symbols = [["NSE:APOLLO|1M"], ["NSE:PERSISTENT|1D"]
     <div className="tradingview-widget-container" ref={container}>
       <div className="tradingview-widget-container__widget"></div>
       <div className="tradingview-widget-copyright">
-        <a href="https://www.tradingview.com/symbols/NSE-APOLLO/" rel="noopener nofollow" target="_blank"><span className="blue-text">APOLLO</span></a>
+        <a href="https://www.tradingview.com/symbols/BSE-APOLLO/" rel="noopener nofollow" target="_blank"><span className="blue-text">APOLLO</span></a>
         <span className="and">&nbsp;and&nbsp;</span>
-        <a href="https://www.tradingview.com/symbols/NSE-PERSISTENT/" rel="noopener nofollow" target="_blank"><span className="blue-text">PERSISTENT stock price</span></a>
+        <a href="https://www.tradingview.com/symbols/BSE-PERSISTENT/" rel="noopener nofollow" target="_blank"><span className="blue-text">PERSISTENT stock price</span></a>
         <span className="trademark">&nbsp;by TradingView</span>
       </div>
     </div>

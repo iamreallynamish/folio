@@ -10,6 +10,7 @@ import { Reveal } from "../ui/Reveal.tsx";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import { spring, SPRING, type SpringHandle } from "../ui/spring.ts";
 import { WalletCard } from "../ui/WalletCard.tsx";
+import { CountUp } from "../ui/motion.tsx";
 
 export function Home() {
   const { user, setUser, version, refresh, go, openTxn, openImport, openAccount } = useApp();
@@ -146,7 +147,7 @@ export function Home() {
       <button className="month-panel" data-tour="budget" onClick={() => go("plan")} aria-label={`${fmtMonth(s.month)}: ${formatMoney(s.spent, s.currency)} spent`}>
         <span className="grow">
           <span className="eyebrow">{fmtMonth(s.month)}</span>
-          <span className="figure">{formatMoney(s.spent, s.currency)}</span>
+          <CountUp className="figure" value={s.spent} format={(v) => formatMoney(Math.round(v), s.currency)} />
           <span className="footnote muted" style={{ display: "block" }}>
             {s.budget != null ? <>{s.remaining >= 0 ? `${formatMoney(s.remaining, s.currency)} left of ${formatMoney(s.budget, s.currency)}` : <span className="neg">{formatMoney(-s.remaining, s.currency)} over budget</span>}</> : "spent · no budget set"}
           </span>
@@ -185,7 +186,7 @@ export function Home() {
         )}
 
         <section className="market-card" aria-label="Market watch">
-          <div className="between section-label"><span>Market watch</span><span className="caption faint">NSE · TradingView</span></div>
+          <div className="between section-label"><span>Market watch</span><span className="caption faint">BSE · TradingView</span></div>
           <div className="market-frame"><TradingViewWidget /></div>
         </section>
 

@@ -5,6 +5,7 @@ import { Icon } from "../ui/Icon.tsx";
 import { LogoMark } from "../ui/Logo.tsx";
 import { Provenance } from "../ui/kit.tsx";
 import { TypeIn } from "../ui/Reveal.tsx";
+import { Reveal } from "../ui/Reveal.tsx";
 
 interface Msg { role: "user" | "assistant"; text: string; answer?: any; fresh?: boolean }
 const SUGGESTIONS = ["How much did I spend this month?", "Which merchants do I spend the most with?", "Where does my money go?", "How much scholarship money have I received?", "Am I within budget?", "How are my investments performing?"];
@@ -34,7 +35,7 @@ export function Assistant() {
   return (
     <div className="screen" style={{ minHeight: "calc(100dvh - 140px)" }}>
       <header className="screen-head">
-        <h1 className="large-title">Ask Folio</h1>
+        <Reveal as="h1" className="large-title" text="Ask Folio" />
         {msgs.length > 0 && <div className="actions"><button className="btn small gray" onClick={() => setMsgs([])}>Clear</button></div>}
       </header>
 

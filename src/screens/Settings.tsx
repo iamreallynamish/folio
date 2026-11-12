@@ -7,6 +7,7 @@ import { Icon } from "../ui/Icon.tsx";
 import { LogoMark } from "../ui/Logo.tsx";
 import { Field, Segmented, setTheme, Sheet, toast, useLoad, useSheetClose, confirmAction } from "../ui/kit.tsx";
 import { CategorySheet } from "./Plan.tsx";
+import { Reveal } from "../ui/Reveal.tsx";
 
 export function Settings() {
   const { user, setUser, accounts, categories, version, refresh, openAccount, openImport, startTour } = useApp();
@@ -34,7 +35,7 @@ export function Settings() {
 
   return (
     <div className="screen">
-      <header className="screen-head"><h1 className="large-title">Settings</h1></header>
+      <header className="screen-head"><Reveal as="h1" className="large-title" text="Settings" /></header>
 
       <div className="list">
         <button className="cell" onClick={() => setSheet("profile")} style={{ padding: "14px 16px" }}>

@@ -6,13 +6,15 @@ import { fmtDate, fmtMonth, fmtMonthShort, formatMoney, slotColor, todayIso } fr
 import { BarChart, Donut, LineChart, type Segment } from "../ui/Charts.tsx";
 import { Icon, ICON_CHOICES } from "../ui/Icon.tsx";
 import { Empty, Field, MonthNav, Notice, Provenance, Ring, Segmented, Sheet, Skeleton, toast, useLoad, useSheetClose, confirmAction } from "../ui/kit.tsx";
+import { Reveal } from "../ui/Reveal.tsx";
+import { CountUp } from "../ui/motion.tsx";
 
 export function Plan() {
   const [view, setView] = useState<"budget" | "income">(() => (sessionStorage.getItem("folio-plan") as any) ?? "budget");
   return (
     <div className="screen">
       <header className="screen-head">
-        <h1 className="large-title">Plan</h1>
+        <Reveal as="h1" className="large-title" text="Plan" />
         <div style={{ width: 210, paddingBottom: 4 }}><Segmented label="View" value={view} onChange={(v) => { setView(v); sessionStorage.setItem("folio-plan", v); }} options={[{ value: "budget", label: "Budget" }, { value: "income", label: "Income" }]} /></div>
       </header>
       {view === "budget" ? <Budget /> : <Income />}
@@ -53,7 +55,7 @@ function Budget() {
         </Ring>
         <div className="grow">
           <div className="eyebrow">Spent in {fmtMonth(month)}</div>
-          <div className="hero">{m(s.spent)}</div>
+          <div className="hero"><CountUp value={s.spent} format={(v) => m(Math.round(v))} /></div>
           <div className="subhead muted">{s.budget == null ? "Set a budget to see what's left." : s.remaining < 0 ? <span className="neg">{m(-s.remaining)} over {m(s.budget)}</span> : `${m(s.remaining)} left of ${m(s.budget)}`}</div>
           <div style={{ marginTop: 8 }}><Provenance kind={s.estimatedPortion ? "estimate" : "verified"} /></div>
           {s.estimatedPortion !== 0 && <p className="caption faint" style={{ marginTop: 6 }}>{m(s.estimatedPortion)} of this was converted using exchange rates you set.</p>}

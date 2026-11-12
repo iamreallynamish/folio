@@ -15,6 +15,8 @@ import { Invest } from "./screens/Invest.tsx";
 import { Assistant } from "./screens/Assistant.tsx";
 import { Settings } from "./screens/Settings.tsx";
 import { AccountSheet, ImportSheet, TxnSheet } from "./screens/sheets.tsx";
+import { MotionConfig } from "motion/react";
+import { useScreenEntrance } from "./ui/motion.tsx";
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "home", label: "Home", icon: "home" }, { id: "activity", label: "Activity", icon: "list" }, { id: "plan", label: "Plan", icon: "pie" },
@@ -63,6 +65,8 @@ export function App() {
    * using View Transitions so the old page animates out while the new one arrives.
    * Tapping the current tab scrolls to the top, as on iOS.
    */
+  const mainRef = useRef<HTMLElement>(null);
+  useScreenEntrance(mainRef, `${tab}:${user?.id ?? ""}`);
   const tabRef = useRef(tab);
   tabRef.current = tab;
   const go = useCallback((t: Tab) => {
@@ -90,6 +94,7 @@ export function App() {
   const Screen = { home: Home, activity: Activity, plan: Plan, invest: Invest, ask: Assistant, settings: Settings }[tab];
   return (
     <Ctx.Provider value={ctx}>
+      <MotionConfig reducedMotion="user">
       <div className="app">
         <nav className="sidebar" aria-label="Main">
           <div className="brand"><LogoMark size={30} />Folio</div>
@@ -97,7 +102,7 @@ export function App() {
           <div style={{ flex: 1 }} />
           <button className="side-link" aria-current={tab === "settings" ? "page" : undefined} onClick={() => go("settings")}>{tab === "settings" && <span className="side-pill" aria-hidden="true" />}<Icon name="gear" />Settings</button>
         </nav>
-        <main className="main" data-section={tab}><Screen key={tab} /></main>
+        <main className="main" data-section={tab} ref={mainRef}><Screen key={tab} /></main>
         <nav className="tabbar" aria-label="Main">
           {TABS.map((t) => <button key={t.id} className="tab" aria-current={tab === t.id ? "page" : undefined} onClick={() => go(t.id)}>{tab === t.id && <span className="tab-pill" aria-hidden="true" />}<Icon name={t.icon} />{t.label}</button>)}
         </nav>
@@ -111,6 +116,7 @@ export function App() {
       {tour && <Tour mode={tour.mode} start={tour.start} onClose={() => setTour(null)} />}
       <ConfirmHost />
       <ToastHost />
+      </MotionConfig>
     </Ctx.Provider>
   );
 }
