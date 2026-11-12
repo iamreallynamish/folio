@@ -818,3 +818,25 @@ h1.text-reveal { font-size: 32px; font-weight: 600; letter-spacing: -0.05em; }
 /* Each step's copy rises in place (the panel itself is moved by its spring). */
 .tour-copy { animation: copy-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
 @keyframes copy-in { from { opacity: 0; transform: translateY(6px); } }
+
+/* ---------- Ambient dither portrait (components/AsciiBackground) ----------
+   Behind everything and faint; on wide screens it lives in the right-hand margin and fades out
+   before the content column, on phones it sits low and fainter still. Hidden where transparency
+   or extra contrast is asked for. */
+.ascii-bg {
+  position: fixed; inset: 0; width: 100vw; height: 100dvh; z-index: 0; pointer-events: none;
+  opacity: 0.16;
+  /* clear of the sidebar and the left of the content; full strength from the middle rightwards */
+  -webkit-mask-image: linear-gradient(90deg, transparent 22%, #000 55%);
+          mask-image: linear-gradient(90deg, transparent 22%, #000 55%);
+  animation: ascii-in 1.6s ease both;
+}
+@keyframes ascii-in { from { opacity: 0; } }
+@media (max-width: 899px) {
+  .ascii-bg { opacity: 0.12; -webkit-mask-image: linear-gradient(180deg, transparent 18%, #000 70%); mask-image: linear-gradient(180deg, transparent 18%, #000 70%); }
+}
+:root[data-theme="light"] .ascii-bg { opacity: 0.09; }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .ascii-bg { opacity: 0.09; } }
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) { .ascii-bg { display: none; } }
+/* The app paints above the ambient canvas (a negative z-index would put it under the body's own background). */
+.app { position: relative; z-index: 1; }

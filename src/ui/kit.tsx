@@ -192,6 +192,17 @@ export function ThemeToggle() {
   useEffect(() => { const f = () => setT(currentTheme()); window.addEventListener("folio:theme", f); return () => window.removeEventListener("folio:theme", f); }, []);
   return <button className="icon-btn" aria-label={t === "dark" ? "Switch to light mode" : "Switch to dark mode"} onClick={() => setTheme(t === "dark" ? "light" : "dark")}><Icon name={t === "dark" ? "sun" : "moon"} /></button>;
 }
+/** Ambient background animation (Settings → Appearance); on unless turned off on this device. */
+export const backgroundOn = () => { try { return localStorage.getItem("folio-bg") !== "off"; } catch { return true; } };
+export function setBackground(on: boolean) {
+  try { on ? localStorage.removeItem("folio-bg") : localStorage.setItem("folio-bg", "off"); } catch { /* storage off */ }
+  window.dispatchEvent(new Event("folio:bg"));
+}
+export function useBackground() {
+  const [on, setOn] = useState(backgroundOn);
+  useEffect(() => { const f = () => setOn(backgroundOn()); window.addEventListener("folio:bg", f); return () => window.removeEventListener("folio:bg", f); }, []);
+  return on;
+}
 export function useMedia(q: string) {
   const [m, setM] = useState(() => matchMedia(q).matches);
   useEffect(() => { const mq = matchMedia(q), f = () => setM(mq.matches); mq.addEventListener("change", f); return () => mq.removeEventListener("change", f); }, [q]);

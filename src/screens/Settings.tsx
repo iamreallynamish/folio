@@ -5,7 +5,7 @@ import { CURRENCIES } from "../../shared/money.ts";
 import { fmtDate, formatMoney, slotColor } from "../format.ts";
 import { Icon } from "../ui/Icon.tsx";
 import { LogoMark } from "../ui/Logo.tsx";
-import { Field, Segmented, setTheme, Sheet, toast, useLoad, useSheetClose, confirmAction } from "../ui/kit.tsx";
+import { Field, Segmented, setBackground, setTheme, Sheet, toast, useBackground, useLoad, useSheetClose, confirmAction } from "../ui/kit.tsx";
 import { CategorySheet } from "./Plan.tsx";
 import { Reveal } from "../ui/Reveal.tsx";
 
@@ -17,6 +17,7 @@ export function Settings() {
   const rules = useLoad(() => api("/categories"), [version]);
   const fx = useLoad(() => api("/fx"), [version]);
 
+  const ambient = useBackground();
   function applyTheme(t: string) { setTheme_(t); setTheme(t as any); }
   async function signOut() { await api("/auth/logout", { method: "POST" }); setUser(null); }
   async function exportData() {
@@ -47,7 +48,8 @@ export function Settings() {
 
       <section>
         <div className="section-label">Appearance</div>
-        <div className="card"><Segmented label="Theme" value={theme} onChange={applyTheme} options={[{ value: "system", label: "Automatic" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} /></div>
+        <div className="card stack"><Segmented label="Theme" value={theme} onChange={applyTheme} options={[{ value: "system", label: "Automatic" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} />
+          <Segmented label="Background animation" value={ambient ? "on" : "off"} onChange={(v) => setBackground(v === "on")} options={[{ value: "on", label: "On" }, { value: "off", label: "Off" }]} /></div>
       </section>
 
       <div className="grid-2">

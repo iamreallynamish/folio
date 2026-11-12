@@ -6,7 +6,8 @@ import { Icon } from "./ui/Icon.tsx";
 import { LogoLoader, LogoMark } from "./ui/Logo.tsx";
 import { reducedMotion } from "./ui/spring.ts";
 import { Tour } from "./screens/Tour.tsx";
-import { ConfirmHost, setCacheOwner, ToastHost } from "./ui/kit.tsx";
+import { ConfirmHost, setCacheOwner, ToastHost, useBackground } from "./ui/kit.tsx";
+import { AsciiBackground } from "@/components/AsciiBackground";
 import { Auth } from "./screens/Auth.tsx";
 import { Home } from "./screens/Home.tsx";
 import { Activity } from "./screens/Activity.tsx";
@@ -66,6 +67,7 @@ export function App() {
    * Tapping the current tab scrolls to the top, as on iOS.
    */
   setCacheOwner(user?.id ?? null);
+  const ambient = useBackground();
   const mainRef = useRef<HTMLElement>(null);
   // Until the first screen is ready, the launch loader stays up: logo, then the finished page — no empty page between.
   const [booted, setBooted] = useState(false);
@@ -99,6 +101,7 @@ export function App() {
   return (<>{veil}
     <Ctx.Provider value={ctx}>
       <MotionConfig reducedMotion="user">
+      {ambient && <AsciiBackground />}
       <div className="app">
         <nav className="sidebar" aria-label="Main">
           <div className="brand"><LogoMark size={30} />Folio</div>
