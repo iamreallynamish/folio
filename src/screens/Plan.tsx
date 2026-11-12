@@ -14,7 +14,7 @@ export function Plan() {
   return (
     <div className="screen">
       <header className="screen-head">
-        <Reveal as="h1" className="large-title" text="Plan" />
+        <Reveal as="h1" className="large-title" text="Plan" once="title-plan" />
         <div style={{ width: 210, paddingBottom: 4 }}><Segmented label="View" value={view} onChange={(v) => { setView(v); sessionStorage.setItem("folio-plan", v); }} options={[{ value: "budget", label: "Budget" }, { value: "income", label: "Income" }]} /></div>
       </header>
       {view === "budget" ? <Budget /> : <Income />}
@@ -55,7 +55,7 @@ function Budget() {
         </Ring>
         <div className="grow">
           <div className="eyebrow">Spent in {fmtMonth(month)}</div>
-          <div className="hero"><CountUp value={s.spent} format={(v) => m(Math.round(v))} /></div>
+          <div className="hero"><CountUp id={`plan-spent-${month}`} value={s.spent} format={(v) => m(Math.round(v))} /></div>
           <div className="subhead muted">{s.budget == null ? "Set a budget to see what's left." : s.remaining < 0 ? <span className="neg">{m(-s.remaining)} over {m(s.budget)}</span> : `${m(s.remaining)} left of ${m(s.budget)}`}</div>
           <div style={{ marginTop: 8 }}><Provenance kind={s.estimatedPortion ? "estimate" : "verified"} /></div>
           {s.estimatedPortion !== 0 && <p className="caption faint" style={{ marginTop: 6 }}>{m(s.estimatedPortion)} of this was converted using exchange rates you set.</p>}

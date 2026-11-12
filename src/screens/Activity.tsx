@@ -39,7 +39,7 @@ export function Activity() {
   return (
     <div className="screen" style={{ gap: 14 }}>
       <header className="screen-head">
-        <Reveal as="h1" className="large-title" text="Activity" />
+        <Reveal as="h1" className="large-title" text="Activity" once="title-activity" />
         <div className="actions">
           <button className="icon-btn" aria-label="Import bank messages" onClick={() => openImport()}><Icon name="tray" /></button>
           <button className="icon-btn" aria-label="Add transaction" onClick={() => openTxn("new")}><Icon name="plus" /></button>

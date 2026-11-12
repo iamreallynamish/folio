@@ -6,7 +6,7 @@ import { Icon } from "./ui/Icon.tsx";
 import { LogoLoader, LogoMark } from "./ui/Logo.tsx";
 import { reducedMotion } from "./ui/spring.ts";
 import { Tour } from "./screens/Tour.tsx";
-import { ConfirmHost, ToastHost } from "./ui/kit.tsx";
+import { ConfirmHost, setCacheOwner, ToastHost } from "./ui/kit.tsx";
 import { Auth } from "./screens/Auth.tsx";
 import { Home } from "./screens/Home.tsx";
 import { Activity } from "./screens/Activity.tsx";
@@ -65,6 +65,7 @@ export function App() {
    * using View Transitions so the old page animates out while the new one arrives.
    * Tapping the current tab scrolls to the top, as on iOS.
    */
+  setCacheOwner(user?.id ?? null);
   const mainRef = useRef<HTMLElement>(null);
   useScreenEntrance(mainRef, `${tab}:${user?.id ?? ""}`);
   const tabRef = useRef(tab);

@@ -35,7 +35,7 @@ export function Assistant() {
   return (
     <div className="screen" style={{ minHeight: "calc(100dvh - 140px)" }}>
       <header className="screen-head">
-        <Reveal as="h1" className="large-title" text="Ask Folio" />
+        <Reveal as="h1" className="large-title" text="Ask Folio" once="title-assistant" />
         {msgs.length > 0 && <div className="actions"><button className="btn small gray" onClick={() => setMsgs([])}>Clear</button></div>}
       </header>
 

@@ -35,7 +35,7 @@ export function Settings() {
 
   return (
     <div className="screen">
-      <header className="screen-head"><Reveal as="h1" className="large-title" text="Settings" /></header>
+      <header className="screen-head"><Reveal as="h1" className="large-title" text="Settings" once="title-settings" /></header>
 
       <div className="list">
         <button className="cell" onClick={() => setSheet("profile")} style={{ padding: "14px 16px" }}>

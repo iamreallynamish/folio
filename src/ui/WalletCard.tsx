@@ -34,7 +34,7 @@ export function WalletCard({ account, onClick, peek = false }: { account: Accoun
       <div className="pc-hardware" aria-hidden="true"><Chip /><Icon name="wave" className="pc-wave" /></div>
       <div className="pc-foot">
         <div className="pc-money">
-          <div className={`bal ${has ? "" : "none"}`}>{has ? <CountUp value={a.balanceMinor!} format={(v) => formatMoney(Math.round(v), a.currency)} /> : bal}</div>
+          <div className={`bal ${has ? "" : "none"}`}>{has ? <CountUp id={`card-${a.id}`} value={a.balanceMinor!} format={(v) => formatMoney(Math.round(v), a.currency)} /> : bal}</div>
           <div className="meta">{updated}</div>
         </div>
         <div className="pc-bot">
@@ -55,7 +55,7 @@ export function WalletCard({ account, onClick, peek = false }: { account: Accoun
       </div>
       <div className="pc-mid">
         <div className="bal-label">Available balance</div>
-        <div className={`bal ${has ? "" : "none"}`}>{has ? <CountUp value={a.balanceMinor!} format={(v) => formatMoney(Math.round(v), a.currency)} /> : bal}</div>
+        <div className={`bal ${has ? "" : "none"}`}>{has ? <CountUp id={`card-${a.id}`} value={a.balanceMinor!} format={(v) => formatMoney(Math.round(v), a.currency)} /> : bal}</div>
       </div>
       <div className="pc-bot">
         <div className="row" style={{ gap: 10 }}>

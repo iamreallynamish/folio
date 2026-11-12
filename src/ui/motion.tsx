@@ -55,10 +55,13 @@ export function enterScreen(screen: HTMLElement) {
 /**
  * Watches <main>; when a new screen has finished loading (no skeletons left), cascades it in once.
  */
+const entered = new Set<string>();
 export function useScreenEntrance(main: React.RefObject<HTMLElement | null>, key: string) {
   useEffect(() => {
     const root = main.current;
-    if (!root) return;
+    // Once per screen per visit: returning to a screen just slides it in, with no second cascade.
+    if (!root || entered.has(key)) return;
+    entered.add(key);
     let done = false;
     const tryEnter = () => {
       if (done) return;
@@ -77,19 +80,22 @@ export function useScreenEntrance(main: React.RefObject<HTMLElement | null>, key
   }, [key]);
 }
 
-/** A number that counts to its value (from 0 on first show, then from the previous value). */
-export function CountUp({ value, format, className }: { value: number; format: (v: number) => string; className?: string }) {
+/** Last shown value per number, so a remount doesn't count up from zero again. */
+const shown = new Map<string, number>();
+/** A number that counts to its value: from 0 the first time it's seen in a visit, then from its last value. */
+export function CountUp({ value, format, className, id }: { value: number; format: (v: number) => string; className?: string; id: string }) {
   const ref = useRef<HTMLSpanElement>(null);
-  const prev = useRef(0);
+  const prev = useRef(shown.get(id) ?? 0);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (reducedMotion() || prev.current === value) { el.textContent = format(value); prev.current = value; return; }
+    if (reducedMotion() || prev.current === value) { el.textContent = format(value); prev.current = value; shown.set(id, value); return; }
     const controls = animate(prev.current, value, {
       duration: 0.9, ease: EASE,
       onUpdate: (v) => { el.textContent = format(v); },
     });
     prev.current = value;
+    shown.set(id, value);
     return () => controls.stop();
   }, [value]);
   // The final value is in the DOM from the start (for screen readers and if JS animation is skipped).

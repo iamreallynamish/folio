@@ -147,7 +147,7 @@ export function Home() {
       <button className="month-panel" data-tour="budget" onClick={() => go("plan")} aria-label={`${fmtMonth(s.month)}: ${formatMoney(s.spent, s.currency)} spent`}>
         <span className="grow">
           <span className="eyebrow">{fmtMonth(s.month)}</span>
-          <CountUp className="figure" value={s.spent} format={(v) => formatMoney(Math.round(v), s.currency)} />
+          <CountUp id="home-month" className="figure" value={s.spent} format={(v) => formatMoney(Math.round(v), s.currency)} />
           <span className="footnote muted" style={{ display: "block" }}>
             {s.budget != null ? <>{s.remaining >= 0 ? `${formatMoney(s.remaining, s.currency)} left of ${formatMoney(s.budget, s.currency)}` : <span className="neg">{formatMoney(-s.remaining, s.currency)} over budget</span>}</> : "spent · no budget set"}
           </span>

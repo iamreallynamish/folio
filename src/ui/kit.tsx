@@ -4,15 +4,28 @@ import { project, reducedMotion, rubberband, spring, SPRING, VelocityTracker, ty
 import { Icon } from "./Icon.tsx";
 
 /** Load data, re-running when `deps` change. Keeps the previous data visible while refreshing. */
+/**
+ * Last result per loader, so a screen you return to renders at once (no skeleton, no height jump)
+ * and refreshes in the background. Scoped to the signed-in user and cleared when that changes.
+ */
+const loadCache = new Map<string, unknown>();
+let cacheOwner: number | null | undefined;
+export function setCacheOwner(id: number | null | undefined) {
+  if (id !== cacheOwner) { loadCache.clear(); cacheOwner = id; }
+}
 export function useLoad<T>(fn: () => Promise<T>, deps: unknown[]) {
-  const [data, setData] = useState<T | null>(null);
+  const src = fn.toString();
+  const exact = src + JSON.stringify(deps);
+  // Same loader and arguments, ignoring the numeric refresh counter ("version").
+  const loose = src + JSON.stringify(deps.filter((d) => typeof d !== "number"));
+  const [data, setData] = useState<T | null>(() => (loadCache.get(exact) ?? loadCache.get(loose) ?? null) as T | null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const seq = useRef(0);
   const reload = useCallback(() => {
     const n = ++seq.current;
     setLoading(true);
-    fn().then((d) => { if (n === seq.current) { setData(d); setError(null); } })
+    fn().then((d) => { loadCache.set(exact, d); loadCache.set(loose, d); if (n === seq.current) { setData(d); setError(null); } })
       .catch((e) => { if (n === seq.current) setError(e.message); })
       .finally(() => { if (n === seq.current) setLoading(false); });
     // eslint-disable-next-line react-hooks/exhaustive-deps

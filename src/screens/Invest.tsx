@@ -21,7 +21,7 @@ export function Invest() {
 
   const head = (
     <header className="screen-head">
-      <Reveal as="h1" className="large-title" text="Invest" />
+      <Reveal as="h1" className="large-title" text="Invest" once="title-invest" />
       <div className="actions">
         {data?.hasKey && data.holdings.length > 0 && <button className="icon-btn" aria-label="Refresh prices" onClick={() => setRefreshKey((k) => k + 1)}><Icon name="refresh" style={loading ? { opacity: 0.4 } : undefined} /></button>}
         <button className="icon-btn" aria-label="Add holding" onClick={() => setEdit("new")}><Icon name="plus" /></button>
@@ -57,7 +57,7 @@ export function Invest() {
               <div className="footnote muted">Portfolio value{data.totals.length > 1 ? ` · ${t.currency}` : ""}</div>
               {t.value != null ? (
                 <>
-                  <div className="hero"><CountUp value={t.value} format={(v) => plain(v, t.currency)} /></div>
+                  <div className="hero"><CountUp id={`invest-${t.currency}`} value={t.value} format={(v) => plain(v, t.currency)} /></div>
                   <div className="row" style={{ flexWrap: "wrap", gap: "4px 18px" }}>
                     <span className={`subhead num ${cls(t.dayChange)}`}><b>{signed(t.dayChange, t.currency)}</b> ({pct(t.dayChangePct)}) latest day</span>
                     <span className={`subhead num ${cls(t.gain)}`}><b>{signed(t.gain, t.currency)}</b> ({pct(t.gainPct)}) overall</span>

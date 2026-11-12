@@ -674,16 +674,15 @@ button, a, [role="button"], .cell, .chip, .tab { touch-action: manipulation; }
 }
 
 /* Page transitions: the outgoing page slips away, the new one arrives from the direction of travel. */
-.main { view-transition-name: page; }
 .tabbar { view-transition-name: tabbar; }
 .sidebar { view-transition-name: sidebar; }
 .tab-pill { view-transition-name: tab-pill; }
 .side-pill { view-transition-name: side-pill; }
-::view-transition-group(page) { animation-duration: 0.42s; }
-html[data-nav="forward"]::view-transition-old(page) { animation: page-out-left 0.16s cubic-bezier(0.4, 0, 1, 1) both; }
-html[data-nav="forward"]::view-transition-new(page) { animation: page-in-right 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.09s both; }
-html[data-nav="back"]::view-transition-old(page) { animation: page-out-right 0.16s cubic-bezier(0.4, 0, 1, 1) both; }
-html[data-nav="back"]::view-transition-new(page) { animation: page-in-left 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.09s both; }
+::view-transition-group(root) { animation-duration: 0.42s; }
+html[data-nav="forward"]::view-transition-old(root) { animation: page-out-left 0.16s cubic-bezier(0.4, 0, 1, 1) both; }
+html[data-nav="forward"]::view-transition-new(root) { animation: page-in-right 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.09s both; }
+html[data-nav="back"]::view-transition-old(root) { animation: page-out-right 0.16s cubic-bezier(0.4, 0, 1, 1) both; }
+html[data-nav="back"]::view-transition-new(root) { animation: page-in-left 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.09s both; }
 @keyframes page-out-left { to { opacity: 0; transform: translateX(-24px); } }
 @keyframes page-out-right { to { opacity: 0; transform: translateX(24px); } }
 @keyframes page-in-right { from { opacity: 0; transform: translateX(44px); } }
@@ -787,3 +786,7 @@ html[data-nav] .screen { animation: none; }
 .tradingview-widget-copyright { font-size: 11px; line-height: 16px; padding: 4px 10px 2px; color: var(--label-3); text-align: right; }
 .tradingview-widget-copyright a { color: var(--label-2); }
 @media (max-width: 899px) { .market-frame { height: 340px; } }
+
+/* A frame whose page isn't declared dark is painted opaque white inside a dark page; matching its
+   colour scheme lets TradingView's transparent background show through. */
+.market-frame iframe { color-scheme: light; background: transparent; }
