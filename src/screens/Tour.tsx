@@ -7,6 +7,7 @@
  * Progress is saved to the account (tour_step), so a reload resumes where the user left off.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { motion, useSpring, type MotionValue } from "motion/react";
 import { api } from "../api.ts";
 import { useApp, type Tab } from "../ctx.ts";
 import { TextEffect } from "@/components/ui/text-effect";
@@ -23,6 +24,13 @@ const STEPS: Step[] = [
   { id: "invest", tab: "invest", title: "Your investments", body: "Add the shares you own and Folio values them with market prices: daily moves, total returns, the biggest movers, news and upcoming earnings." },
 ];
 const WELCOME_MS = 5000;
+/** The spotlight glides between targets on a spring (no overshoot to speak of), and keeps its velocity
+ *  when the target changes mid-flight — e.g. while the page scrolls the next section into view. */
+const GLIDE = { visualDuration: 0.55, bounce: 0.12 };
+/** Moves a group of springs to new values: the first placement (or Reduce Motion) jumps, later ones glide. */
+function drive(pairs: [MotionValue<number>, number][], jump: boolean) {
+  for (const [mv, v] of pairs) jump ? mv.jump(v) : mv.set(v);
+}
 const PAD = 8;
 
 type Rect = { top: number; left: number; width: number; height: number; radius: number };
@@ -37,6 +45,20 @@ export function Tour({ mode, start, onClose }: { mode: "first" | "replay"; start
   const [panelPos, setPanelPos] = useState<{ top: number; left: number } | null>(null);
   const panel = useRef<HTMLDivElement>(null);
   const target = useRef<Element | null>(null);
+  // Spotlight geometry and panel position as springs (transform for position; GPU-composited).
+  const sx = useSpring(0, GLIDE), sy = useSpring(0, GLIDE), sw = useSpring(0, GLIDE), sh = useSpring(0, GLIDE), sr = useSpring(20, GLIDE);
+  const px = useSpring(0, GLIDE), py = useSpring(0, GLIDE);
+  const spotPlaced = useRef(false), panelPlaced = useRef(false);
+  useEffect(() => {
+    if (!rect) { drive([[sx, innerWidth / 2], [sy, innerHeight / 2], [sw, 0], [sh, 0]], !spotPlaced.current || reducedMotion()); return; }
+    drive([[sx, rect.left], [sy, rect.top], [sw, rect.width], [sh, rect.height], [sr, rect.radius]], !spotPlaced.current || reducedMotion());
+    spotPlaced.current = true;
+  }, [rect]);
+  useEffect(() => {
+    if (!panelPos) return;
+    drive([[px, panelPos.left], [py, panelPos.top]], !panelPlaced.current || reducedMotion());
+    panelPlaced.current = true;
+  }, [panelPos]);
 
   const save = useCallback((body: object) => {
     if (mode !== "first") return; // replaying never changes saved progress
@@ -51,10 +73,15 @@ export function Tour({ mode, start, onClose }: { mode: "first" | "replay"; start
   }, [phase]);
 
   // ---- measure the current target and keep the spotlight on it while scrolling / resizing
+  // While the page scrolls a section into view, the spotlight is already gliding to where that section
+  // will end up; following it mid-scroll would make the light swing past and come back.
+  const scrollTarget = useRef<number | null>(null);
   const measure = useCallback(() => {
     const el = target.current;
     if (!el) return;
-    const r = el.getBoundingClientRect();
+    const r0 = el.getBoundingClientRect();
+    const shift = scrollTarget.current === null ? 0 : scrollTarget.current - scrollY;
+    const r = { top: r0.top - shift, left: r0.left, width: r0.width, height: r0.height };
     const radius = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 20;
     // Very tall sections: spotlight their top part so the explanation still fits beside it.
     const height = Math.min(r.height, innerHeight * 0.5);
@@ -79,8 +106,15 @@ export function Tour({ mode, start, onClose }: { mode: "first" | "replay"; start
       const r = el.getBoundingClientRect();
       const fits = r.top >= 72 && r.top + Math.min(r.height, innerHeight * 0.5) <= innerHeight - 260;
       if (!fits) {
-        const y = scrollY + r.top - Math.max(72, (innerHeight - Math.min(r.height, innerHeight * 0.5) - 260) / 2);
-        scrollTo({ top: Math.max(0, y), behavior: reducedMotion() ? "auto" : "smooth" });
+        const max = document.documentElement.scrollHeight - innerHeight;
+        const y = Math.round(Math.min(max, Math.max(0, scrollY + r.top - Math.max(72, (innerHeight - Math.min(r.height, innerHeight * 0.5) - 260) / 2))));
+        if (Math.abs(y - scrollY) > 1) {
+          scrollTarget.current = y;
+          const settle = () => { scrollTarget.current = null; removeEventListener("scrollend", settle); clearTimeout(t); measure(); };
+          const t = setTimeout(settle, 900); // browsers without scrollend
+          addEventListener("scrollend", settle);
+          scrollTo({ top: y, behavior: reducedMotion() ? "auto" : "smooth" });
+        }
       }
       measure();
     };
@@ -181,8 +215,8 @@ export function Tour({ mode, start, onClose }: { mode: "first" | "replay"; start
     <div className="tour-layer" role="dialog" aria-modal="true" aria-label={`Tour: ${s.title}`}>
       {/* Blocks the app underneath; the spotlight's shadow does the dimming. */}
       <div className="tour-catch" />
-      <div className={`tour-spot ${rect ? "" : "none"}`} style={rect ? { top: rect.top, left: rect.left, width: rect.width, height: rect.height, borderRadius: rect.radius } : undefined} aria-hidden="true" />
-      <div className="tour-panel" ref={panel} tabIndex={-1} style={panelPos ? { top: panelPos.top, left: panelPos.left } : { opacity: 0 }}>
+      <motion.div className={`tour-spot ${rect ? "" : "none"}`} style={{ x: sx, y: sy, width: sw, height: sh, borderRadius: sr }} aria-hidden="true" />
+      <motion.div className="tour-panel" ref={panel} tabIndex={-1} style={{ x: px, y: py, opacity: panelPos ? 1 : 0 }}>
         <div className="between">
           <span className="eyebrow">Step {step + 1} of {STEPS.length}</span>
           <button className="btn plain small" style={{ minHeight: 28 }} onClick={skip}>Skip tour</button>
@@ -201,7 +235,7 @@ export function Tour({ mode, start, onClose }: { mode: "first" | "replay"; start
             <button className="btn primary small" onClick={next} autoFocus>{step === STEPS.length - 1 ? "Finish" : "Next"}</button>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

@@ -809,3 +809,12 @@ h1.text-reveal { font-size: 32px; font-weight: 600; letter-spacing: -0.05em; }
 .main[data-entered] > .screen { animation: none; }
 /* Launch loader held over the app until the first screen is ready (same look as the sign-in loader). */
 .boot-veil { position: fixed; inset: 0; z-index: 100; }
+
+/* Tour: position and size are driven by Motion springs (Tour.tsx), so no CSS transitions on them. */
+.tour-spot { top: 0; left: 0; transition: none; will-change: transform; }
+.tour-spot.none { top: 0; left: 0; }
+.tour-panel { top: 0; left: 0; transition: opacity 0.3s; will-change: transform; animation: panel-fade 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes panel-fade { from { opacity: 0; } }
+/* Each step's copy rises in place (the panel itself is moved by its spring). */
+.tour-copy { animation: copy-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes copy-in { from { opacity: 0; transform: translateY(6px); } }

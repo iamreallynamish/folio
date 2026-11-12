@@ -83,6 +83,13 @@ export function Settings() {
             <Row icon="pie" tint="var(--s5)" title="Categories and budgets" value={`${categories.length}`} onClick={() => setSheet("categories")} />
             <Row icon="repeat" tint="var(--s3)" title="Learned merchants" value={`${rules.data?.rules.length ?? 0}`} onClick={() => setSheet("categories")} />
             <Row icon="spark" tint="var(--s1)" title="Replay setup" onClick={startTour} />
+            <Row icon="repeat" tint="var(--s4)" title="Show setup next time" value={user.onboarded ? "Off" : "On"} onClick={async () => {
+              try {
+                const r = await api("/me", { method: "PATCH", body: { onboarded: !user.onboarded } });
+                setUser(r.user);
+                toast(r.user.onboarded ? "Setup won't show next time" : "Setup will show next time you open Folio");
+              } catch (e: any) { toast(e.message); }
+            }} />
           </div>
         </section>
 

@@ -189,4 +189,7 @@ test("first-run tour progress is saved and finishing marks the account onboarded
   assert.equal(done.onboarded, true);
   assert.equal(done.tourStep, 0);
   assert.equal((await C("PATCH", "/me", { tourStep: 99 })).body.user.tourStep, 10, "out-of-range steps are clamped");
+  const again = (await C("PATCH", "/me", { onboarded: false })).body.user;
+  assert.equal(again.onboarded, false, "setup can be asked for again");
+  assert.equal(again.tourStep, 0, "and starts from the welcome");
 });

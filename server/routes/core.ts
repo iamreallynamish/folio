@@ -37,6 +37,8 @@ core.patch("/me", h(async (req, res) => {
   const th = b.alertThreshold !== undefined ? Math.min(100, Math.max(50, Math.round(Number(b.alertThreshold)) || 80)) : u.alert_threshold;
   const name = b.name !== undefined ? String(b.name).trim().slice(0, 60) || bad("Enter your name.") : u.name;
   await run("UPDATE users SET name=?, base_currency=?, monthly_budget_minor=?, alert_threshold=? WHERE id=?", name, base, budget, th, u.id);
+  // onboarded:false asks for the first-run setup again the next time the app opens.
+  if (b.onboarded === false) await run("UPDATE users SET onboarded_at=NULL, tour_step=0 WHERE id=?", u.id);
   if (b.onboarded === true && !u.onboarded_at) await run("UPDATE users SET onboarded_at=? WHERE id=?", now(), u.id);
   // Guided-tour progress, so a reload resumes at the same step.
   if (b.tourStep !== undefined) await run("UPDATE users SET tour_step=? WHERE id=?", Math.max(0, Math.min(10, Math.trunc(Number(b.tourStep)) || 0)), u.id);
