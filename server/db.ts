@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
   onboarded_at TEXT COLLATE "C"
 );
 ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarded_at TEXT COLLATE "C";
+ALTER TABLE users ADD COLUMN IF NOT EXISTS tour_step INTEGER NOT NULL DEFAULT 0;
 CREATE TABLE IF NOT EXISTS sessions (
   token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   expires_at TEXT COLLATE "C" NOT NULL, created_at TEXT COLLATE "C" NOT NULL
@@ -99,7 +100,7 @@ CREATE INDEX IF NOT EXISTS txn_category ON transactions(category_id);
  * Detects whether the newest schema change is already in place (one query on a warm database).
  * When adding to SCHEMA, write the change idempotently and point this check at it.
  */
-const SCHEMA_CHECK = "SELECT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass('public.users') AND attname = 'onboarded_at' AND NOT attisdropped) AS t";
+const SCHEMA_CHECK = "SELECT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass('public.users') AND attname = 'tour_step' AND NOT attisdropped) AS t";
 const TABLES = ["users", "sessions", "accounts", "categories", "merchant_rules", "transactions", "seen_sms", "fx_rates", "income_sources", "income_payments", "holdings", "market_cache", "rate_hits"];
 /**
  * Supabase exposes the public schema through its Data API. Row-level security with no policies

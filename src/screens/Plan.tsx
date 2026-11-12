@@ -219,6 +219,7 @@ function Income() {
   }
   return (
     <>
+      <div className="stack" style={{ gap: 16 }} data-tour="income">
       {data.totals.map((t: any) => (
         <div className="grid-2" key={t.currency}>
           <div className="card stack" style={{ gap: 6 }}>
@@ -237,13 +238,14 @@ function Income() {
           </div>
         </div>
       ))}
-      {data.sources.length > 0 && <Notice>Only money marked as received is counted. Expected payments are a schedule, and refunds are never income.</Notice>}
       {data.sources.length === 0 && (
         <div className="card"><Empty icon="cap" title="No income recorded">
           <p className="subhead">Add a scholarship, allowance, family transfer or part-time job, with the dates you expect to be paid.</p>
           <button className="btn primary small" onClick={() => setAddSource(true)}>Add income</button>
         </Empty></div>
       )}
+      </div>
+      {data.sources.length > 0 && <Notice>Only money marked as received is counted. Expected payments are a schedule, and refunds are never income.</Notice>}
       {data.sources.map((s: any) => {
         const [label, icon, slot] = KIND[s.kind] ?? KIND.other;
         return (

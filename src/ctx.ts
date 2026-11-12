@@ -8,6 +8,10 @@ export interface AppCtx {
   version: number; refresh: () => void;
   accounts: Account[]; categories: Category[];
   go: (tab: Tab) => void;
+  /** The current tab (the tour navigates between them). */
+  tab: Tab;
+  /** Replay the guided tour (Settings). */
+  startTour: () => void;
   openTxn: (t: Txn | "new") => void;
   openImport: (text?: string) => void;
   openAccount: (a: Account | "new") => void;

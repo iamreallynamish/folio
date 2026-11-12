@@ -5,7 +5,7 @@ import { Ctx, type Tab } from "./ctx.ts";
 import { Icon } from "./ui/Icon.tsx";
 import { LogoLoader, LogoMark } from "./ui/Logo.tsx";
 import { reducedMotion } from "./ui/spring.ts";
-import { Onboarding } from "./screens/Onboarding.tsx";
+import { Tour } from "./screens/Tour.tsx";
 import { ConfirmHost, ToastHost } from "./ui/kit.tsx";
 import { Auth } from "./screens/Auth.tsx";
 import { Home } from "./screens/Home.tsx";
@@ -32,6 +32,9 @@ export function App() {
   const [txn, setTxn] = useState<Txn | "new" | null>(null);
   const [importing, setImporting] = useState<{ text?: string } | null>(null);
   const [account, setAccount] = useState<Account | "new" | null>(null);
+  const [tour, setTour] = useState<{ mode: "first" | "replay"; start: number } | null>(null);
+  // The welcome and tour start by themselves only until the account has finished or skipped them.
+  useEffect(() => { if (user && !user.onboarded) setTour((t) => t ?? { mode: "first", start: user.tourStep }); }, [user?.id]);
 
   useEffect(() => {
     api("/me").then((r) => setUser(r.user)).catch(() => setUser(null));
@@ -76,15 +79,13 @@ export function App() {
   const goRef = useRef(go);
   goRef.current = go;
   const ctx = useMemo(() => ({
-    user: user!, setUser, version, refresh, accounts, categories, go,
+    user: user!, setUser, version, refresh, accounts, categories, go, tab,
+    startTour: () => { go("home"); setTimeout(() => setTour({ mode: "replay", start: 1 }), 350); },
     openTxn: setTxn, openImport: (text?: string) => setImporting({ text }), openAccount: setAccount,
-  }), [user, version, refresh, accounts, categories, go]);
+  }), [user, version, refresh, accounts, categories, go, tab]);
 
   if (user === undefined) return <div className="auth" aria-busy="true"><LogoLoader size={72} /></div>;
   if (!user) return <><Auth onDone={(u) => { setUser(u); go("home"); }} /><ToastHost /></>;
-
-  // First sign-in: a short guided setup before the app.
-  if (!user.onboarded) return <Ctx.Provider value={ctx}><Onboarding /><ConfirmHost /><ToastHost /></Ctx.Provider>;
 
   const Screen = { home: Home, activity: Activity, plan: Plan, invest: Invest, ask: Assistant, settings: Settings }[tab];
   return (
@@ -107,6 +108,7 @@ export function App() {
       {txn && <TxnSheet txn={txn} onClose={() => setTxn(null)} />}
       {importing && <ImportSheet initialText={importing.text} onClose={() => setImporting(null)} />}
       {account && <AccountSheet account={account} onClose={() => setAccount(null)} />}
+      {tour && <Tour mode={tour.mode} start={tour.start} onClose={() => setTour(null)} />}
       <ConfirmHost />
       <ToastHost />
     </Ctx.Provider>

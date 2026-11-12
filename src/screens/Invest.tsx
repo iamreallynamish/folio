@@ -32,7 +32,7 @@ export function Invest() {
   if (data.holdings.length === 0) {
     return (
       <div className="screen">{head}
-        <div className="card"><Empty icon="trend" title="No holdings yet">
+        <div className="card" data-tour="invest"><Empty icon="trend" title="No holdings yet">
           <p className="subhead">Add the shares you own with the quantity and your average purchase price. Folio never invents holdings; prices come from Alpha Vantage.</p>
           <button className="btn primary small" onClick={() => setEdit("new")}>Add a holding</button>
         </Empty></div>
@@ -46,12 +46,12 @@ export function Invest() {
     <div className="screen">{head}
       {data.notice && <Notice kind={data.hasKey ? "warning" : "info"}>{data.notice}{!data.hasKey && <> <button className="btn plain" style={{ minHeight: 0, padding: 0, fontSize: 14 }} onClick={() => go("settings")}>Open Settings</button></>}</Notice>}
 
-      {data.totals.map((t: any) => {
+      {data.totals.map((t: any, ti: number) => {
         const hs = data.holdings.filter((h: any) => h.currency === t.currency);
         const segs: Segment[] = hs.filter((h: any) => h.value != null).sort((a: any, b: any) => b.value - a.value).map((h: any, i: number) => ({ id: h.id, label: h.symbol, value: h.value, color: slotColor(i < 7 ? i + 1 : 0) }));
         return (
           <div key={t.currency} className="stack" style={{ gap: 16 }}>
-            <div className="card stack">
+            <div className="card stack" data-tour={ti === 0 ? "invest" : undefined}>
               <div className="footnote muted">Portfolio value{data.totals.length > 1 ? ` · ${t.currency}` : ""}</div>
               {t.value != null ? (
                 <>

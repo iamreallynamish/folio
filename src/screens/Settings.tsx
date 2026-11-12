@@ -9,7 +9,7 @@ import { Field, Segmented, setTheme, Sheet, toast, useLoad, useSheetClose, confi
 import { CategorySheet } from "./Plan.tsx";
 
 export function Settings() {
-  const { user, setUser, accounts, categories, version, refresh, openAccount, openImport } = useApp();
+  const { user, setUser, accounts, categories, version, refresh, openAccount, openImport, startTour } = useApp();
   const [theme, setTheme_] = useState(localStorage.getItem("folio-theme") ?? "system");
   const [cat, setCat] = useState<Category | "new" | null>(null);
   const [sheet, setSheet] = useState<"profile" | "password" | "market" | "ai" | "fx" | "categories" | null>(null);
@@ -81,6 +81,7 @@ export function Settings() {
           <div className="list">
             <Row icon="pie" tint="var(--s5)" title="Categories and budgets" value={`${categories.length}`} onClick={() => setSheet("categories")} />
             <Row icon="repeat" tint="var(--s3)" title="Learned merchants" value={`${rules.data?.rules.length ?? 0}`} onClick={() => setSheet("categories")} />
+            <Row icon="spark" tint="var(--s1)" title="Replay the tour" onClick={startTour} />
           </div>
         </section>
 

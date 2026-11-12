@@ -94,7 +94,7 @@ export function Home() {
 
       <div className="home-grid">
       <div className="home-col">
-      <section aria-label="Cards">
+      <section aria-label="Cards" data-tour="cards">
         <div className={`wallet-stack ${stacked ? "stacked" : ""}`}>
           {ordered.map((a: any, i: number) => {
             const peek = stacked && i < ordered.length - 1;
@@ -127,7 +127,7 @@ export function Home() {
         </div>
       )}
 
-        <section aria-label="Latest transactions">
+        <section aria-label="Latest transactions" data-tour="transactions">
           <div className="between section-label"><span>Latest Transactions</span>{data.recent.length > 0 && <button className="btn plain small" style={{ minHeight: 24 }} onClick={() => go("activity")}>See all</button>}</div>
           <div className="list">
             {data.recent.slice(0, 5).map((t: any) => <TxnRow key={t.id} t={t} onClick={() => openTxn(t)} />)}
@@ -142,7 +142,7 @@ export function Home() {
         </section>
       </div>
       <div className="home-col">
-      <button className="month-panel" onClick={() => go("plan")} aria-label={`${fmtMonth(s.month)}: ${formatMoney(s.spent, s.currency)} spent`}>
+      <button className="month-panel" data-tour="budget" onClick={() => go("plan")} aria-label={`${fmtMonth(s.month)}: ${formatMoney(s.spent, s.currency)} spent`}>
         <span className="grow">
           <span className="eyebrow">{fmtMonth(s.month)}</span>
           <span className="figure">{formatMoney(s.spent, s.currency)}</span>

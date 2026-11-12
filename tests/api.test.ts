@@ -177,3 +177,16 @@ test("ingest endpoint with personal token", async () => {
   const bad = await fetch(base + "/ingest/sms", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer nope" }, body: "{}" });
   assert.equal(bad.status, 401);
 });
+
+test("first-run tour progress is saved and finishing marks the account onboarded", async () => {
+  const C = client();
+  const r = await C("POST", "/auth/register", { email: `tour${Date.now()}@example.com`, name: "Tour", password: "a long test password" });
+  assert.equal(r.body.user.onboarded, false);
+  assert.equal(r.body.user.tourStep, 0);
+  assert.equal((await C("PATCH", "/me", { tourStep: 3 })).body.user.tourStep, 3);
+  assert.equal((await C("GET", "/me")).body.user.tourStep, 3, "a reload resumes at the saved step");
+  const done = (await C("PATCH", "/me", { onboarded: true, tourStep: 0 })).body.user;
+  assert.equal(done.onboarded, true);
+  assert.equal(done.tourStep, 0);
+  assert.equal((await C("PATCH", "/me", { tourStep: 99 })).body.user.tourStep, 10, "out-of-range steps are clamped");
+});

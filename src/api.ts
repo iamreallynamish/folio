@@ -16,7 +16,7 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
   return data as T;
 }
 
-export interface User { id: number; email: string; name: string; baseCurrency: string; monthlyBudgetMinor: number | null; alertThreshold: number; lastReviewedAt: string; hasMarketKey: boolean; hasAssistantKey: boolean; hasIngestToken: boolean; onboarded: boolean }
+export interface User { id: number; email: string; name: string; baseCurrency: string; monthlyBudgetMinor: number | null; alertThreshold: number; lastReviewedAt: string; hasMarketKey: boolean; hasAssistantKey: boolean; hasIngestToken: boolean; onboarded: boolean; tourStep: number }
 export interface Account { id: number; kind: string; bank: string | null; name: string; cardType: string | null; last4: string | null; currency: string; balanceMinor: number | null; balanceAsOf: string | null; balanceSource: string | null; theme: string }
 export interface Category { id: number; key: string | null; name: string; icon: string; slot: number; kind: string; budgetMinor: number | null }
 export interface Txn {
