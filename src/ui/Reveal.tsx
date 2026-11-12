@@ -1,4 +1,4 @@
-import { useReducedMotion } from "framer-motion";
+import { useReducedMotion } from "motion/react";
 import { useState } from "react";
 import { TextEffect } from "@/components/ui/text-effect";
 
