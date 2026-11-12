@@ -10,7 +10,19 @@ export class MarketError extends Error { constructor(message: string, public cod
 const BASE = "https://www.alphavantage.co/query";
 const HOUR = 3600e3;
 
+/**
+ * Free keys allow one request per second (and 25 a day): requests are queued at least 1.2 s apart,
+ * so loading several holdings at once doesn't get all but the first refused.
+ */
+let nextSlot = 0;
+async function paced() {
+  const wait = nextSlot - Date.now();
+  nextSlot = Math.max(Date.now(), nextSlot) + 1200;
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+}
+
 async function av(key: string, params: Record<string, string>, csv = false): Promise<any> {
+  await paced();
   const url = `${BASE}?${new URLSearchParams({ ...params, apikey: key })}`;
   let res: Response;
   try { res = await fetch(url, { signal: AbortSignal.timeout(15000) }); }
@@ -26,7 +38,11 @@ async function av(key: string, params: Record<string, string>, csv = false): Pro
 }
 
 interface Cached<T> { data: T; fetchedAt: string; stale: boolean }
+/** A symbol the provider doesn't carry is remembered for a week, so it doesn't use up the daily allowance on every visit. */
+const MISSING_TTL = 7 * 24 * HOUR;
 async function cached<T>(key: string, ttl: number, load: () => Promise<T>, force = false): Promise<Cached<T>> {
+  const miss = await get<{ fetched_at: string }>("SELECT fetched_at FROM market_cache WHERE key = ?", `missing:${key}`);
+  if (miss && !force && Date.now() - Date.parse(miss.fetched_at) < MISSING_TTL) throw new MarketError("The provider does not carry this symbol.", "not_found");
   const row = await get<{ payload: string; fetched_at: string }>("SELECT payload, fetched_at FROM market_cache WHERE key = ?", key);
   if (row && !force && Date.now() - Date.parse(row.fetched_at) < ttl) return { data: JSON.parse(row.payload), fetchedAt: row.fetched_at, stale: false };
   try {
@@ -34,6 +50,8 @@ async function cached<T>(key: string, ttl: number, load: () => Promise<T>, force
     await run("INSERT INTO market_cache(key,payload,fetched_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET payload=excluded.payload, fetched_at=excluded.fetched_at", key, JSON.stringify(data), now());
     return { data, fetchedAt: now(), stale: false };
   } catch (e) {
+    if (e instanceof MarketError && e.code === "not_found")
+      await run("INSERT INTO market_cache(key,payload,fetched_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET fetched_at=excluded.fetched_at", `missing:${key}`, "{}", now());
     if (row) return { data: JSON.parse(row.payload), fetchedAt: row.fetched_at, stale: true };
     throw e;
   }
@@ -42,7 +60,7 @@ async function cached<T>(key: string, ttl: number, load: () => Promise<T>, force
 export interface Series { symbol: string; points: { date: string; close: number }[] }
 /** ~100 trading days of closes. One call gives the latest price, the day's change and history. */
 export function series(key: string, symbol: string, force = false) {
-  return cached<Series>(`series:${symbol}`, 6 * HOUR, async () => {
+  return cached<Series>(`series:${symbol}`, 12 * HOUR, async () => {
     const d = await av(key, { function: "TIME_SERIES_DAILY", symbol, outputsize: "compact" });
     const ts = d["Time Series (Daily)"];
     if (!ts) throw new MarketError("No price history for this symbol.", "not_found");
@@ -63,7 +81,7 @@ export function search(key: string, q: string) {
 export interface NewsItem { title: string; url: string; source: string; publishedAt: string; summary: string; sentiment: string | null; tickers: string[] }
 export function news(key: string, symbols: string[]) {
   const tickers = symbols.map((s) => s.split(".")[0]).sort();
-  return cached<NewsItem[]>(`news:${tickers.join(",")}`, 3 * HOUR, async () => {
+  return cached<NewsItem[]>(`news:${tickers.join(",")}`, 12 * HOUR, async () => {
     const d = await av(key, { function: "NEWS_SENTIMENT", tickers: tickers.join(","), limit: "30", sort: "LATEST" });
     return (d.feed ?? []).slice(0, 20).map((f: any) => {
       const t = String(f.time_published ?? "");
@@ -80,7 +98,7 @@ export function news(key: string, symbols: string[]) {
 export interface EarningsItem { symbol: string; name: string; reportDate: string; fiscalDateEnding: string; estimate: number | null; currency: string }
 export function earnings(key: string, symbol: string) {
   const base = symbol.split(".")[0];
-  return cached<EarningsItem[]>(`earnings:${base}`, 24 * HOUR, async () => {
+  return cached<EarningsItem[]>(`earnings:${base}`, 7 * 24 * HOUR, async () => {
     const csv = await av(key, { function: "EARNINGS_CALENDAR", symbol: base, horizon: "3month" }, true);
     if (typeof csv !== "string") return [];
     return csv.trim().split(/\r?\n/).slice(1).map((line) => {

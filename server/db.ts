@@ -83,6 +83,8 @@ CREATE TABLE IF NOT EXISTS holdings (
   symbol TEXT NOT NULL, name TEXT NOT NULL, quantity DOUBLE PRECISION NOT NULL, avg_price DOUBLE PRECISION NOT NULL,
   currency TEXT NOT NULL, created_at TEXT COLLATE "C" NOT NULL, UNIQUE(user_id, symbol)
 );
+-- Your plan for a holding, in your words ("Long-term keep", "Watch").
+ALTER TABLE holdings ADD COLUMN IF NOT EXISTS plan TEXT;
 CREATE TABLE IF NOT EXISTS market_cache (key TEXT PRIMARY KEY, payload TEXT NOT NULL, fetched_at TEXT COLLATE "C" NOT NULL);
 CREATE TABLE IF NOT EXISTS rate_hits (key TEXT NOT NULL, at BIGINT NOT NULL);
 CREATE INDEX IF NOT EXISTS rate_hits_key ON rate_hits(key, at);
@@ -100,7 +102,7 @@ CREATE INDEX IF NOT EXISTS txn_category ON transactions(category_id);
  * Detects whether the newest schema change is already in place (one query on a warm database).
  * When adding to SCHEMA, write the change idempotently and point this check at it.
  */
-const SCHEMA_CHECK = "SELECT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass('public.users') AND attname = 'tour_step' AND NOT attisdropped) AS t";
+const SCHEMA_CHECK = "SELECT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass('public.holdings') AND attname = 'plan' AND NOT attisdropped) AS t";
 const TABLES = ["users", "sessions", "accounts", "categories", "merchant_rules", "transactions", "seen_sms", "fx_rates", "income_sources", "income_payments", "holdings", "market_cache", "rate_hits"];
 /**
  * Supabase exposes the public schema through its Data API. Row-level security with no policies

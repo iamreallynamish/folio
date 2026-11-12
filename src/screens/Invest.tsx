@@ -93,7 +93,7 @@ export function Invest() {
                 {hs.map((h: any) => (
                   <button className="cell" key={h.id} onClick={() => setEdit(h)} style={{ alignItems: "flex-start" }}>
                     <span className="grow">
-                      <span className="row" style={{ gap: 8 }}><span className="headline">{h.symbol}</span>{Math.abs(h.dayChangePct ?? 0) >= 3 && <span className={`badge ${h.dayChangePct > 0 ? "verified" : "over"}`}>{pct(h.dayChangePct)} today</span>}</span>
+                      <span className="row" style={{ gap: 8, flexWrap: "wrap" }}><span className="headline">{h.symbol}</span>{h.plan && <span className={`badge ${/watch/i.test(h.plan) ? "estimate" : ""}`} title="Your plan">{h.plan}</span>}{Math.abs(h.dayChangePct ?? 0) >= 3 && <span className={`badge ${h.dayChangePct > 0 ? "verified" : "over"}`}>{pct(h.dayChangePct)} today</span>}</span>
                       <span className="footnote muted truncate" style={{ display: "block" }}>{h.name}</span>
                       <span className="caption faint num" style={{ display: "block" }}>{h.quantity} × avg {plain(h.avgPrice, h.currency)}{h.price != null ? ` · now ${plain(h.price, h.currency)}` : ""}</span>
                     </span>
@@ -180,7 +180,7 @@ function HoldingSheet({ holding, hasKey, onClose }: { holding: any | "new"; hasK
   const sheet = useSheetClose(onClose);
   const { refresh } = useApp();
   const h = holding === "new" ? null : holding;
-  const [f, setF] = useState({ symbol: h?.symbol ?? "", name: h?.name ?? "", quantity: h ? String(h.quantity) : "", avgPrice: h ? String(h.avgPrice) : "", currency: h?.currency ?? "USD" });
+  const [f, setF] = useState({ symbol: h?.symbol ?? "", name: h?.name ?? "", quantity: h ? String(h.quantity) : "", avgPrice: h ? String(h.avgPrice) : "", currency: h?.currency ?? "USD", plan: h?.plan ?? "" });
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<any[]>([]);
   const [error, setError] = useState("");
@@ -215,6 +215,8 @@ function HoldingSheet({ holding, hasKey, onClose }: { holding: any | "new"; hasK
         <Field label="Quantity"><input className="input num" inputMode="decimal" value={f.quantity} onChange={set("quantity")} /></Field>
         <Field label="Average purchase price"><input className="input num" inputMode="decimal" value={f.avgPrice} onChange={set("avgPrice")} /></Field>
       </div>
+      <Field label="Your plan"><input className="input" list="holding-plans" value={f.plan} onChange={set("plan")} placeholder="e.g. Long-term keep, Watch, Buy more" maxLength={60} /></Field>
+      <datalist id="holding-plans"><option value="Long-term keep" /><option value="Watch" /><option value="Buy more" /><option value="Sell at target" /></datalist>
       <p className="footnote muted">Use the symbol exactly as Alpha Vantage lists it. Exchanges outside the US carry a suffix, for example .BSE, .LON or .T.</p>
       {error && <p className="error" role="alert">{error}</p>}
       {h && <button className="btn danger block" onClick={remove}><Icon name="trash" />Remove holding</button>}

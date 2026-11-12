@@ -10,7 +10,7 @@ export const portfolio = Router();
 const round = (n: number, d = 2) => Math.round(n * 10 ** d) / 10 ** d;
 
 export interface HoldingView {
-  id: number; symbol: string; name: string; quantity: number; avgPrice: number; currency: string; cost: number;
+  id: number; symbol: string; name: string; quantity: number; avgPrice: number; currency: string; cost: number; plan: string | null;
   price: number | null; priceDate: string | null; previousClose: number | null; dayChange: number | null; dayChangePct: number | null;
   value: number | null; gain: number | null; gainPct: number | null; stale: boolean; error: string | null; allocationPct: number | null;
 }
@@ -25,7 +25,7 @@ export async function portfolioView(user: User, force = false) {
   let fetchedAt: string | null = null;
   for (const r of rows) {
     const v: HoldingView = {
-      id: r.id, symbol: r.symbol, name: r.name, quantity: r.quantity, avgPrice: r.avg_price, currency: r.currency, cost: round(r.quantity * r.avg_price),
+      id: r.id, symbol: r.symbol, name: r.name, quantity: r.quantity, avgPrice: r.avg_price, currency: r.currency, cost: round(r.quantity * r.avg_price), plan: r.plan ?? null,
       price: null, priceDate: null, previousClose: null, dayChange: null, dayChangePct: null, value: null, gain: null, gainPct: null, stale: false, error: null, allocationPct: null,
     };
     if (key) {
@@ -106,19 +106,20 @@ function holdingFields(b: any, prev?: any) {
   if (!name) bad("Enter the company name.");
   const currency = b.currency !== undefined ? String(b.currency).toUpperCase() : prev?.currency;
   if (!CURRENCIES.includes(currency)) bad("Unsupported currency.");
-  return { symbol, quantity, avgPrice, name, currency };
+  const plan = b.plan !== undefined ? String(b.plan ?? "").trim().slice(0, 60) || null : prev?.plan ?? null;
+  return { symbol, quantity, avgPrice, name, currency, plan };
 }
 portfolio.post("/holdings", h(async (req, res) => {
   const f = holdingFields(req.body);
   if (await get("SELECT 1 FROM holdings WHERE user_id = ? AND symbol = ?", req.user.id, f.symbol)) bad("You already have this holding. Edit it instead.");
-  await run("INSERT INTO holdings(user_id,symbol,name,quantity,avg_price,currency,created_at) VALUES (?,?,?,?,?,?,?)", req.user.id, f.symbol, f.name, f.quantity, f.avgPrice, f.currency, now());
+  await run("INSERT INTO holdings(user_id,symbol,name,quantity,avg_price,currency,plan,created_at) VALUES (?,?,?,?,?,?,?,?)", req.user.id, f.symbol, f.name, f.quantity, f.avgPrice, f.currency, f.plan, now());
   res.status(201).json({ ok: true });
 }));
 portfolio.patch("/holdings/:id", h(async (req, res) => {
   const prev = await get<any>("SELECT * FROM holdings WHERE id = ? AND user_id = ?", Number(req.params.id), req.user.id);
   if (!prev) throw new HttpError(404, "Not found.");
   const f = holdingFields(req.body, prev);
-  await run("UPDATE holdings SET symbol=?, name=?, quantity=?, avg_price=?, currency=? WHERE id=?", f.symbol, f.name, f.quantity, f.avgPrice, f.currency, prev.id);
+  await run("UPDATE holdings SET symbol=?, name=?, quantity=?, avg_price=?, currency=?, plan=? WHERE id=?", f.symbol, f.name, f.quantity, f.avgPrice, f.currency, f.plan, prev.id);
   res.json({ ok: true });
 }));
 portfolio.delete("/holdings/:id", h(async (req, res) => { await run("DELETE FROM holdings WHERE id = ? AND user_id = ?", Number(req.params.id), req.user.id); res.json({ ok: true }); }));
