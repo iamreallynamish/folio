@@ -840,3 +840,28 @@ h1.text-reveal { font-size: 32px; font-weight: 600; letter-spacing: -0.05em; }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) { .ascii-bg { display: none; } }
 /* The app paints above the ambient canvas (a negative z-index would put it under the body's own background). */
 .app { position: relative; z-index: 1; }
+
+/* ---------- Touch, corners and scrollbars (HIG: feedback only while touching; content inside its container) ----------
+   Touch screens report the last tapped element as hovered until something else is tapped, which left a
+   tapped row highlighted (with square corners over the list's rounded edge) and a tapped card lifted. Hover
+   now applies only to devices with a real pointer; a press highlights only while the finger is down. */
+@media (hover: none) {
+  button.cell:hover, .side-link:hover { background: none; }
+  .legend-row:hover:not(.on) { background: none; }
+  button.pay-card:hover { transform: none; }
+  button.cell:active { background: var(--fill); }
+  button.pay-card:active { transform: scale(0.985); }
+}
+/* Rows share their list's corners, and the list clips reliably: Safari doesn't clip a moving or highlighted
+   child to a rounded parent unless the parent is its own layer. */
+.list, .stat-grid, .card.flush, .market-frame { isolation: isolate; }
+.list > :first-child, .list > :first-child > .cell { border-top-left-radius: inherit; border-top-right-radius: inherit; }
+.list > :last-child, .list > :last-child > .cell { border-bottom-left-radius: inherit; border-bottom-right-radius: inherit; }
+.list > :first-child > .cell, .list > :last-child > .cell { border-radius: inherit; }
+
+/* Scrollbars: thin, transparent track, a quiet thumb that only shows what's needed (like macOS overlay scrollbars). */
+* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--label) 26%, transparent) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; background: transparent; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--label) 26%, transparent); border: 3px solid transparent; border-radius: 10px; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--label) 42%, transparent); }
