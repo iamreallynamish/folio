@@ -13,7 +13,7 @@ import path from "node:path";
 type Row = Record<string, any>;
 type P = string | number | null | boolean;
 interface Exec { query(sql: string, params: unknown[]): Promise<{ rows: Row[]; rowCount: number }> }
-interface Driver { base: Exec; transaction<T>(fn: (e: Exec) => Promise<T>): Promise<T> }
+interface Driver { base: Exec; transaction<T>(fn: (e: Exec) => Promise<T>): Promise<T>; /** Several statements in one round trip. */ script(sql: string): Promise<void> }
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -93,6 +93,7 @@ CREATE INDEX IF NOT EXISTS txn_account ON transactions(account_id);
 CREATE INDEX IF NOT EXISTS txn_transfer_account ON transactions(transfer_account_id);
 CREATE INDEX IF NOT EXISTS txn_category ON transactions(category_id);
 `;
+const SCHEMA_MARKER = "txn_category";
 const TABLES = ["users", "sessions", "accounts", "categories", "merchant_rules", "transactions", "seen_sms", "fx_rates", "income_sources", "income_payments", "holdings", "market_cache", "rate_hits"];
 /**
  * Supabase exposes the public schema through its Data API. Row-level security with no policies
@@ -120,6 +121,8 @@ async function postgresDriver(url: string): Promise<Driver> {
   });
   return {
     base: wrap(pool),
+    // A parameterless query uses the simple protocol, which accepts many statements at once.
+    script: async (sql) => { await pool.query(sql); },
     async transaction(fn) {
       const client = await pool.connect();
       try {
@@ -144,7 +147,7 @@ async function pgliteDriver(): Promise<Driver> {
   const wrap = (c: { query: (s: string, p: unknown[]) => Promise<any> }): Exec => ({
     query: async (s, p) => { const r = await c.query(s, p); return { rows: r.rows, rowCount: r.affectedRows ?? 0 }; },
   });
-  return { base: wrap(db), transaction: (fn) => db.transaction((t) => fn(wrap(t))) };
+  return { base: wrap(db), transaction: (fn) => db.transaction((t) => fn(wrap(t))), script: async (sql) => { await db.exec(sql); } };
 }
 
 /** A deployment configuration problem, reported to the browser in plain words (never with secrets). */
@@ -168,11 +171,13 @@ async function init(): Promise<Driver> {
   if (!url && process.env.VERCEL) throw new ConfigError("DATABASE_URL is not set. Add your Supabase Transaction pooler string in Vercel → Project → Settings → Environment Variables, then redeploy.");
   if (url && /\[YOUR-PASSWORD\]/i.test(url)) throw new ConfigError("DATABASE_URL still contains [YOUR-PASSWORD]. Replace it, including the brackets, with your database password.");
   const d = url ? await postgresDriver(url) : await pgliteDriver();
-  await d.transaction(async (e) => {
-    // Serialise schema setup when several serverless instances start at once.
-    await e.query("SELECT pg_advisory_xact_lock(727274)", []);
-    for (const stmt of `${SCHEMA}\n${LOCKDOWN}`.split(";").map((s) => s.trim()).filter(Boolean)) await e.query(stmt, []);
-  });
+  // One round trip on a warm database: skip setup when the newest schema object already exists.
+  // (Update SCHEMA_MARKER whenever the schema gains objects.)
+  const present = (await d.base.query(`SELECT to_regclass('public.${SCHEMA_MARKER}') AS t`, [])).rows[0]?.t;
+  if (!present) {
+    // A second round trip only on first setup; the advisory lock serialises instances starting together.
+    await d.script(`BEGIN;\nSELECT pg_advisory_xact_lock(727274);\n${SCHEMA}\n${LOCKDOWN}\nCOMMIT;`);
+  }
   return d;
 }
 

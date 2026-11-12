@@ -86,10 +86,11 @@ export async function register(req: Request, res: Response) {
   const id = await tx(async () => {
     const t = now();
     const uid = await insert("INSERT INTO users(email,name,pass_hash,base_currency,last_reviewed_at,created_at) VALUES (?,?,?,?,?,?)", email, name, hash, base, t, t);
-    for (const c of DEFAULT_CATEGORIES) await run("INSERT INTO categories(user_id,key,name,icon,slot,kind) VALUES (?,?,?,?,?,?)", uid, c.key, c.name, c.icon, c.slot, c.kind);
-    for (const c of STARTER_CARDS)
-      await run("INSERT INTO accounts(user_id,kind,bank,name,card_type,last4,currency,theme,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
-        uid, "card", c.bank, `${c.bank} ${c.card_type}`, c.card_type, c.last4, c.currency, c.theme, t);
+    // One statement each for categories and cards: sign-up is a few round trips, not twenty.
+    await run(`INSERT INTO categories(user_id,key,name,icon,slot,kind) VALUES ${DEFAULT_CATEGORIES.map(() => "(?,?,?,?,?,?)").join(",")}`,
+      ...DEFAULT_CATEGORIES.flatMap((c) => [uid, c.key, c.name, c.icon, c.slot, c.kind]));
+    await run(`INSERT INTO accounts(user_id,kind,bank,name,card_type,last4,currency,theme,created_at) VALUES ${STARTER_CARDS.map(() => "(?,?,?,?,?,?,?,?,?)").join(",")}`,
+      ...STARTER_CARDS.flatMap((c) => [uid, "card", c.bank, `${c.bank} ${c.card_type}`, c.card_type, c.last4, c.currency, c.theme, t]));
     return uid;
   });
   await startSession(res, id);
