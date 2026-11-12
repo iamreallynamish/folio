@@ -1,0 +1,192 @@
+/**
+ * Database access. Production runs on Supabase (Postgres) via DATABASE_URL.
+ * Without DATABASE_URL, an embedded Postgres (PGlite) is used for local development and tests,
+ * so the same SQL runs everywhere.
+ *
+ * Queries are written with `?` placeholders and converted to Postgres `$n` parameters.
+ * Every query inside `tx()` runs on the transaction's own connection.
+ */
+import { AsyncLocalStorage } from "node:async_hooks";
+import fs from "node:fs";
+import path from "node:path";
+
+type Row = Record<string, any>;
+type P = string | number | null | boolean;
+interface Exec { query(sql: string, params: unknown[]): Promise<{ rows: Row[]; rowCount: number }> }
+interface Driver { base: Exec; transaction<T>(fn: (e: Exec) => Promise<T>): Promise<T> }
+
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL, pass_hash TEXT NOT NULL,
+  base_currency TEXT NOT NULL DEFAULT 'JPY', monthly_budget_minor BIGINT, alert_threshold INTEGER NOT NULL DEFAULT 80,
+  last_reviewed_at TEXT COLLATE "C" NOT NULL, av_key_enc TEXT, anthropic_key_enc TEXT, ingest_token_hash TEXT, created_at TEXT COLLATE "C" NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at TEXT COLLATE "C" NOT NULL, created_at TEXT COLLATE "C" NOT NULL
+);
+CREATE TABLE IF NOT EXISTS accounts (
+  id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL, bank TEXT, name TEXT NOT NULL, card_type TEXT, last4 TEXT, currency TEXT NOT NULL,
+  balance_minor BIGINT, balance_as_of TEXT COLLATE "C", balance_source TEXT, balance_updated_at TEXT COLLATE "C",
+  theme TEXT NOT NULL DEFAULT 'graphite', archived INTEGER NOT NULL DEFAULT 0, created_at TEXT COLLATE "C" NOT NULL
+);
+CREATE TABLE IF NOT EXISTS categories (
+  id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  key TEXT, name TEXT NOT NULL, icon TEXT NOT NULL DEFAULT 'dots', slot INTEGER NOT NULL DEFAULT 0,
+  kind TEXT NOT NULL DEFAULT 'expense', budget_minor BIGINT, UNIQUE(user_id, name)
+);
+CREATE TABLE IF NOT EXISTS merchant_rules (
+  id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  merchant_key TEXT NOT NULL, merchant TEXT NOT NULL, category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+  created_at TEXT COLLATE "C" NOT NULL, UNIQUE(user_id, merchant_key)
+);
+CREATE TABLE IF NOT EXISTS transactions (
+  id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
+  transfer_account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
+  type TEXT NOT NULL, amount_minor BIGINT NOT NULL, currency TEXT NOT NULL,
+  date TEXT COLLATE "C" NOT NULL, time TEXT COLLATE "C", tz TEXT, date_inferred INTEGER NOT NULL DEFAULT 0,
+  merchant TEXT NOT NULL, merchant_key TEXT NOT NULL, raw_descriptor TEXT,
+  category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL, subcategory TEXT,
+  payment_method TEXT, note TEXT, source TEXT NOT NULL, sms_hash TEXT, fingerprint TEXT NOT NULL, raw_sms TEXT,
+  income_payment_id INTEGER, needs_review INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT COLLATE "C" NOT NULL, updated_at TEXT COLLATE "C" NOT NULL
+);
+CREATE INDEX IF NOT EXISTS txn_user_date ON transactions(user_id, date);
+CREATE INDEX IF NOT EXISTS txn_user_fp ON transactions(user_id, fingerprint);
+CREATE UNIQUE INDEX IF NOT EXISTS txn_user_sms ON transactions(user_id, sms_hash) WHERE sms_hash IS NOT NULL;
+CREATE TABLE IF NOT EXISTS seen_sms (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, sms_hash TEXT NOT NULL,
+  class TEXT NOT NULL, created_at TEXT COLLATE "C" NOT NULL, PRIMARY KEY(user_id, sms_hash)
+);
+CREATE TABLE IF NOT EXISTS fx_rates (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, from_ccy TEXT NOT NULL, to_ccy TEXT NOT NULL,
+  rate DOUBLE PRECISION NOT NULL, updated_at TEXT COLLATE "C" NOT NULL, PRIMARY KEY(user_id, from_ccy, to_ccy)
+);
+CREATE TABLE IF NOT EXISTS income_sources (
+  id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL, name TEXT NOT NULL, currency TEXT NOT NULL, recurrence TEXT NOT NULL DEFAULT 'none',
+  amount_minor BIGINT, notes TEXT, created_at TEXT COLLATE "C" NOT NULL
+);
+CREATE TABLE IF NOT EXISTS income_payments (
+  id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  source_id INTEGER NOT NULL REFERENCES income_sources(id) ON DELETE CASCADE,
+  expected_date TEXT COLLATE "C", expected_minor BIGINT NOT NULL DEFAULT 0,
+  received_minor BIGINT NOT NULL DEFAULT 0, received_date TEXT COLLATE "C", note TEXT, updated_at TEXT COLLATE "C" NOT NULL
+);
+CREATE TABLE IF NOT EXISTS holdings (
+  id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  symbol TEXT NOT NULL, name TEXT NOT NULL, quantity DOUBLE PRECISION NOT NULL, avg_price DOUBLE PRECISION NOT NULL,
+  currency TEXT NOT NULL, created_at TEXT COLLATE "C" NOT NULL, UNIQUE(user_id, symbol)
+);
+CREATE TABLE IF NOT EXISTS market_cache (key TEXT PRIMARY KEY, payload TEXT NOT NULL, fetched_at TEXT COLLATE "C" NOT NULL);
+CREATE TABLE IF NOT EXISTS rate_hits (key TEXT NOT NULL, at BIGINT NOT NULL);
+CREATE INDEX IF NOT EXISTS rate_hits_key ON rate_hits(key, at);
+CREATE INDEX IF NOT EXISTS accounts_user ON accounts(user_id);
+CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS income_sources_user ON income_sources(user_id);
+CREATE INDEX IF NOT EXISTS income_payments_user ON income_payments(user_id);
+CREATE INDEX IF NOT EXISTS income_payments_source ON income_payments(source_id);
+CREATE INDEX IF NOT EXISTS merchant_rules_category ON merchant_rules(category_id);
+CREATE INDEX IF NOT EXISTS txn_account ON transactions(account_id);
+CREATE INDEX IF NOT EXISTS txn_transfer_account ON transactions(transfer_account_id);
+CREATE INDEX IF NOT EXISTS txn_category ON transactions(category_id);
+`;
+const TABLES = ["users", "sessions", "accounts", "categories", "merchant_rules", "transactions", "seen_sms", "fx_rates", "income_sources", "income_payments", "holdings", "market_cache", "rate_hits"];
+/**
+ * Supabase exposes the public schema through its Data API. Row-level security with no policies
+ * blocks that API entirely; the app connects as the table owner, which RLS does not restrict.
+ */
+const LOCKDOWN = TABLES.map((t) => `ALTER TABLE ${t} ENABLE ROW LEVEL SECURITY;`).join("\n");
+
+async function postgresDriver(url: string): Promise<Driver> {
+  const pg = (await import("pg")).default;
+  // BIGINT and NUMERIC (e.g. SUM, COUNT) arrive as strings by default; amounts here fit in a double.
+  pg.types.setTypeParser(20, (v) => Number(v));
+  pg.types.setTypeParser(1700, (v) => Number(v));
+  const ca = process.env.DATABASE_CA?.replace(/\\n/g, "\n");
+  const local = /@(localhost|127\.0\.0\.1)[:/]/.test(url);
+  const pool = new pg.Pool({
+    connectionString: url,
+    max: Number(process.env.DATABASE_POOL_MAX ?? 3),
+    idleTimeoutMillis: 10_000,
+    // Supabase requires TLS. With DATABASE_CA set (Supabase dashboard → Database → SSL), the server
+    // certificate is verified; without it the connection is still encrypted but not verified.
+    ssl: local ? undefined : ca ? { ca, rejectUnauthorized: true } : { rejectUnauthorized: false },
+  });
+  const wrap = (c: { query: (s: string, p: unknown[]) => Promise<any> }): Exec => ({
+    query: async (s, p) => { const r = await c.query(s, p); return { rows: r.rows, rowCount: r.rowCount ?? 0 }; },
+  });
+  return {
+    base: wrap(pool),
+    async transaction(fn) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const out = await fn(wrap(client));
+        await client.query("COMMIT");
+        return out;
+      } catch (e) {
+        await client.query("ROLLBACK").catch(() => {});
+        throw e;
+      } finally { client.release(); }
+    },
+  };
+}
+
+async function pgliteDriver(): Promise<Driver> {
+  const { PGlite, types } = await import("@electric-sql/pglite");
+  const file = process.env.FOLIO_DB;
+  const dir = file === ":memory:" ? undefined : path.resolve(file ?? "data/pglite");
+  if (dir) fs.mkdirSync(dir, { recursive: true });
+  const db = await PGlite.create(dir, { parsers: { [types.INT8]: (v: string) => Number(v), [types.NUMERIC]: (v: string) => Number(v) } });
+  const wrap = (c: { query: (s: string, p: unknown[]) => Promise<any> }): Exec => ({
+    query: async (s, p) => { const r = await c.query(s, p); return { rows: r.rows, rowCount: r.affectedRows ?? 0 }; },
+  });
+  return { base: wrap(db), transaction: (fn) => db.transaction((t) => fn(wrap(t))) };
+}
+
+async function init(): Promise<Driver> {
+  const url = process.env.DATABASE_URL;
+  if (!url && process.env.VERCEL) throw new Error("DATABASE_URL is not set. Add your Supabase connection string in the Vercel project settings.");
+  const d = url ? await postgresDriver(url) : await pgliteDriver();
+  await d.transaction(async (e) => {
+    // Serialise schema setup when several serverless instances start at once.
+    await e.query("SELECT pg_advisory_xact_lock(727274)", []);
+    for (const stmt of `${SCHEMA}\n${LOCKDOWN}`.split(";").map((s) => s.trim()).filter(Boolean)) await e.query(stmt, []);
+  });
+  return d;
+}
+
+let driver: Promise<Driver> | null = null;
+/** Connects and creates the schema once per process. */
+export const ready = () => (driver ??= init().catch((e) => { driver = null; throw e; }));
+
+const store = new AsyncLocalStorage<Exec>();
+const placeholders = new Map<string, string>();
+function toPg(sql: string) {
+  let out = placeholders.get(sql);
+  if (!out) {
+    let i = 0;
+    out = sql.replace(/\?/g, () => `$${++i}`);
+    placeholders.set(sql, out);
+  }
+  return out;
+}
+async function exec(sql: string, params: P[]) {
+  const e = store.getStore() ?? (await ready()).base;
+  return e.query(toPg(sql), params);
+}
+
+export const all = async <T = any>(sql: string, ...p: P[]) => (await exec(sql, p)).rows as T[];
+export const get = async <T = any>(sql: string, ...p: P[]) => (await exec(sql, p)).rows[0] as T | undefined;
+export const run = async (sql: string, ...p: P[]) => ({ changes: (await exec(sql, p)).rowCount });
+/** INSERT … and return the new row's id. */
+export const insert = async (sql: string, ...p: P[]) => Number((await exec(`${sql} RETURNING id`, p)).rows[0].id);
+export const now = () => new Date().toISOString();
+/** Run `fn` in a transaction; every query inside it uses the transaction's connection. */
+export async function tx<T>(fn: () => Promise<T>): Promise<T> {
+  if (store.getStore()) return fn();
+  return (await ready()).transaction((e) => store.run(e, fn));
+}
