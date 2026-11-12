@@ -807,3 +807,5 @@ h1.text-reveal { font-size: 32px; font-weight: 600; letter-spacing: -0.05em; }
    no fade-in of placeholders followed by a second entrance. */
 .main[data-entering] > .screen { opacity: 0; animation: none; }
 .main[data-entered] > .screen { animation: none; }
+/* Launch loader held over the app until the first screen is ready (same look as the sign-in loader). */
+.boot-veil { position: fixed; inset: 0; z-index: 100; }

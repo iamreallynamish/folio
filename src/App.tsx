@@ -67,7 +67,10 @@ export function App() {
    */
   setCacheOwner(user?.id ?? null);
   const mainRef = useRef<HTMLElement>(null);
-  useScreenEntrance(mainRef, `${tab}:${user?.id ?? ""}`);
+  // Until the first screen is ready, the launch loader stays up: logo, then the finished page — no empty page between.
+  const [booted, setBooted] = useState(false);
+  useScreenEntrance(mainRef, `${tab}:${user?.id ?? ""}`, () => setBooted(true));
+  const veil = !booted && <div key="veil" className="auth boot-veil" aria-busy="true"><LogoLoader size={72} /></div>;
   const tabRef = useRef(tab);
   tabRef.current = tab;
   const go = useCallback((t: Tab) => {
@@ -89,11 +92,11 @@ export function App() {
     openTxn: setTxn, openImport: (text?: string) => setImporting({ text }), openAccount: setAccount,
   }), [user, version, refresh, accounts, categories, go, tab]);
 
-  if (user === undefined) return <div className="auth" aria-busy="true"><LogoLoader size={72} /></div>;
+  if (user === undefined) return <>{veil}{null}</>;
   if (!user) return <><Auth onDone={(u) => { setUser(u); go("home"); }} /><ToastHost /></>;
 
   const Screen = { home: Home, activity: Activity, plan: Plan, invest: Invest, ask: Assistant, settings: Settings }[tab];
-  return (
+  return (<>{veil}
     <Ctx.Provider value={ctx}>
       <MotionConfig reducedMotion="user">
       <div className="app">
@@ -119,5 +122,5 @@ export function App() {
       <ToastHost />
       </MotionConfig>
     </Ctx.Provider>
-  );
+  </>);
 }

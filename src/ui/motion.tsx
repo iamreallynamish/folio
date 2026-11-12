@@ -57,17 +57,20 @@ export function enterScreen(screen: HTMLElement) {
  * Watches <main>; when a new screen has finished loading (no skeletons left), cascades it in once.
  */
 const entered = new Set<string>();
-export function useScreenEntrance(main: React.RefObject<HTMLElement | null>, key: string) {
+export function useScreenEntrance(main: React.RefObject<HTMLElement | null>, key: string, onShown?: () => void) {
+  const shownCb = useRef(onShown);
+  shownCb.current = onShown;
   // Layout effect: runs before the new screen's first paint, so its placeholders never flash.
   useLayoutEffect(() => {
     const root = main.current;
     // Once per screen per visit: returning to a screen just slides it in, with no second cascade.
-    if (!root || entered.has(key)) { if (root) { delete root.dataset.entering; delete root.dataset.entered; } return; }
+    if (!root) return;
+    if (entered.has(key)) { delete root.dataset.entering; delete root.dataset.entered; shownCb.current?.(); return; }
     entered.add(key);
     delete root.dataset.entered;
     root.dataset.entering = "";
     let done = false;
-    const reveal = () => { delete root.dataset.entering; };
+    const reveal = () => { if (root.dataset.entering === undefined) return; delete root.dataset.entering; shownCb.current?.(); };
     const tryEnter = () => {
       if (done) return;
       const screen = root.querySelector<HTMLElement>(":scope > .screen");
