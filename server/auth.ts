@@ -19,8 +19,8 @@ export class HttpError extends Error { constructor(public status: number, messag
 
 /** The cards this instance is set up for; balances stay unknown until a bank message states one. */
 const STARTER_CARDS = [
-  { bank: "ICICI Bank", card_type: "Forex Prepaid Card", last4: "0817", currency: "JPY", theme: "ember" },
-  { bank: "Axis Bank", card_type: "Card", last4: "7117", currency: "JPY", theme: "plum" },
+  { bank: "ICICI Bank", card_type: "Student Forex Prepaid Card", last4: "0817", currency: "JPY", theme: "icici-student" },
+  { bank: "Axis Bank", card_type: "Privilege Credit Card", last4: "7117", currency: "JPY", theme: "axis-privilege" },
 ];
 
 /**

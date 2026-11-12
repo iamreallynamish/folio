@@ -5,7 +5,7 @@ import { CURRENCIES, decimals, fromMinor } from "../../shared/money.ts";
 import { SAMPLE_MESSAGES } from "../../shared/sms.ts";
 import { fmtDate, formatMoney, slotColor, todayIso } from "../format.ts";
 import { txnAmount, txnCard, txnCategory, txnIcon } from "../ui/TxnRow.tsx";
-import { Field, Notice, Segmented, Sheet, toast, useLoad } from "../ui/kit.tsx";
+import { Field, Notice, Segmented, Sheet, toast, useLoad, useSheetClose, confirmAction, hideRow } from "../ui/kit.tsx";
 import { Icon } from "../ui/Icon.tsx";
 import { WalletCard } from "../ui/WalletCard.tsx";
 
@@ -13,6 +13,7 @@ const TYPES = [{ value: "expense", label: "Expense" }, { value: "refund", label:
 
 // ---------------------------------------------------------------- transaction
 export function TxnSheet({ txn, onClose }: { txn: Txn | "new"; onClose: () => void }) {
+  const sheet = useSheetClose(onClose);
   const { user, accounts, categories, refresh } = useApp();
   const t = txn === "new" ? null : txn;
   // Existing: details first. New: amount keypad first, then details.
@@ -57,7 +58,7 @@ export function TxnSheet({ txn, onClose }: { txn: Txn | "new"; onClose: () => vo
     try {
       const r = await api(t ? `/transactions/${t.id}` : "/transactions", { method: t ? "PATCH" : "POST", body });
       toast(t ? (r.alsoUpdated ? `Saved. ${r.alsoUpdated} more from ${f.merchant} updated.` : "Saved") : `Added to ${r.transaction.categoryName ?? "your activity"}`);
-      refresh(); onClose();
+      refresh(); sheet.dismiss();
     } catch (e: any) {
       if (e instanceof ApiError && e.status === 409) setDup(true);
       setError(e.message);
@@ -67,16 +68,24 @@ export function TxnSheet({ txn, onClose }: { txn: Txn | "new"; onClose: () => vo
     try {
       const r = await api(`/transactions/${t!.id}`, { method: "PATCH", body: { categoryId: id } });
       toast(r.alsoUpdated ? `Moved, with ${r.alsoUpdated} more from ${t!.merchant}` : `Moved. Folio will remember ${t!.merchant}.`);
-      refresh(); onClose();
+      refresh(); sheet.dismiss();
     } catch (e: any) { setError(e.message); }
   }
-  async function remove() {
-    if (!t || !confirm("Delete this transaction?")) return;
-    await api(`/transactions/${t.id}`, { method: "DELETE" });
-    toast("Transaction deleted"); refresh(); onClose();
+  /** Deleting is undoable for five seconds, so it needs no confirmation (alerts.md: no alerts for undoable actions). */
+  function remove() {
+    if (!t) return;
+    const id = t.id;
+    hideRow(id, true);
+    sheet.dismiss();
+    const timer = setTimeout(async () => {
+      try { await api(`/transactions/${id}`, { method: "DELETE" }); refresh(); }
+      catch (e: any) { toast(e.message); }
+      finally { hideRow(id, false); }
+    }, 5000);
+    toast(`Deleted ${t.merchant}`, { label: "Undo", onClick: () => { clearTimeout(timer); hideRow(id, false); } }, 5000);
   }
   async function linkIncome() {
-    try { await api(`/transactions/${t!.id}/link-income`, { body: { sourceId: Number(sourceId) } }); toast("Recorded as income"); refresh(); onClose(); }
+    try { await api(`/transactions/${t!.id}/link-income`, { body: { sourceId: Number(sourceId) } }); toast("Recorded as income"); refresh(); sheet.dismiss(); }
     catch (e: any) { setError(e.message); }
   }
 
@@ -91,7 +100,7 @@ export function TxnSheet({ txn, onClose }: { txn: Txn | "new"; onClose: () => vo
       ["Repeats", t.recurring ? "Looks recurring (estimate)" : null], ["Note", t.note], ["Source", t.source === "manual" ? "Entered by you" : "Bank message"],
     ];
     return (
-      <Sheet title="Details" cancelLabel="Done" onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 600 }} onClick={() => setMode("edit")}>Edit</button>}>
+      <Sheet closeRef={sheet.ref} title="Details" cancelLabel="Done" onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 600 }} onClick={() => setMode("edit")}>Edit</button>}>
         <div className="detail-hero">
           <span className="tx-icon xl" style={{ ["--tint" as any]: tint }}><Icon name={txnIcon(t)} /></span>
           <div className="headline">{t.merchant}</div>
@@ -132,7 +141,7 @@ export function TxnSheet({ txn, onClose }: { txn: Txn | "new"; onClose: () => vo
     const acct = accounts.find((a) => String(a.id) === f.accountId);
     const go = (type: "expense" | "income" | "transfer") => { setF({ ...f, type, categoryId: "" }); setMode("edit"); };
     return (
-      <Sheet title="New transaction" onClose={onClose}>
+      <Sheet closeRef={sheet.ref} title="New transaction" onClose={onClose}>
         <div className="keypad-amount">
           <div className="amount-xl" aria-live="polite">{shown}</div>
           <div className="row" style={{ justifyContent: "center", gap: 8 }}>
@@ -157,7 +166,7 @@ export function TxnSheet({ txn, onClose }: { txn: Txn | "new"; onClose: () => vo
 
   // ---------- edit / finish new ----------
   return (
-    <Sheet title={t ? "Edit transaction" : "Details"} onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} disabled={busy} onClick={() => save()}>{t ? "Save" : "Add"}</button>}>
+    <Sheet closeRef={sheet.ref} title={t ? "Edit transaction" : "Details"} onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} disabled={busy} onClick={() => save()}>{t ? "Save" : "Add"}</button>}>
       <button className="detail-hero" onClick={() => !t && setMode("amount")} disabled={!!t} aria-label="Change amount">
         <div className="amount-xl">{shown}</div>
         <div className="footnote muted">{TYPES.find((x) => x.value === f.type)?.label}{!t ? " · tap to change amount" : ""}</div>
@@ -204,6 +213,7 @@ export function TxnSheet({ txn, onClose }: { txn: Txn | "new"; onClose: () => vo
 const STATUS: Record<string, [string, string]> = { new: ["verified", "New"], duplicate: ["", "Duplicate"], ignored: ["", "Ignored"], balance: ["estimate", "Balance only"] };
 
 export function ImportSheet({ initialText, onClose }: { initialText?: string; onClose: () => void }) {
+  const sheet = useSheetClose(onClose);
   const { refresh, user, setUser } = useApp();
   const [mode, setMode] = useState<"paste" | "file" | "auto">("paste");
   const [text, setText] = useState(initialText ?? "");
@@ -231,7 +241,7 @@ export function ImportSheet({ initialText, onClose }: { initialText?: string; on
     try {
       const r = await api("/sms/import", { body: payload });
       toast(`${r.imported} added${r.duplicates ? ` · ${r.duplicates} duplicate${r.duplicates > 1 ? "s" : ""} skipped` : ""}${r.ignored ? ` · ${r.ignored} ignored` : ""}`);
-      refresh(); onClose();
+      refresh(); sheet.dismiss();
     } catch (e: any) { setError(e.message); } finally { setBusy(false); }
   }
   async function makeToken() { const r = await api("/me/ingest-token", { method: "POST" }); setToken(r.token); setUser({ ...user, hasIngestToken: true }); }
@@ -239,7 +249,7 @@ export function ImportSheet({ initialText, onClose }: { initialText?: string; on
   const endpoint = `${location.origin}/api/ingest/sms`;
 
   return (
-    <Sheet title="Import bank messages" onClose={onClose}>
+    <Sheet closeRef={sheet.ref} title="Import bank messages" onClose={onClose}>
       <Segmented label="Import method" value={mode} onChange={setMode} options={[{ value: "paste", label: "Paste" }, { value: "file", label: "File" }, { value: "auto", label: "Automatic" }]} />
       {mode === "paste" && (
         <>
@@ -316,8 +326,9 @@ export function ImportSheet({ initialText, onClose }: { initialText?: string; on
 }
 
 // ---------------------------------------------------------------- account
-const THEMES = ["ember", "plum", "graphite", "ocean", "mint", "sand"];
+const THEMES = ["icici-student", "axis-privilege", "ember", "plum", "graphite", "ocean", "mint", "sand"];
 export function AccountSheet({ account, onClose }: { account: Account | "new"; onClose: () => void }) {
+  const sheet = useSheetClose(onClose);
   const { refresh, user } = useApp();
   const a = account === "new" ? null : account;
   const [f, setF] = useState({
@@ -330,17 +341,17 @@ export function AccountSheet({ account, onClose }: { account: Account | "new"; o
   async function save() {
     const body: any = { ...f, name: f.name || [f.bank, f.cardType].filter(Boolean).join(" ") };
     if (f.balance === originalBalance) delete body.balance; else body.balance = f.balance === "" ? null : f.balance;
-    try { await api(a ? `/accounts/${a.id}` : "/accounts", { method: a ? "PATCH" : "POST", body }); toast("Saved"); refresh(); onClose(); }
+    try { await api(a ? `/accounts/${a.id}` : "/accounts", { method: a ? "PATCH" : "POST", body }); toast("Saved"); refresh(); sheet.dismiss(); }
     catch (e: any) { setError(e.message); }
   }
   async function remove() {
-    if (!a || !confirm(`Remove ${a.name}? Its transactions are kept.`)) return;
-    await api(`/accounts/${a.id}`, { method: "DELETE" }); toast("Account removed"); refresh(); onClose();
+    if (!a || !(await confirmAction({ title: `Remove ${a.name}?`, message: "Its transactions are kept but will no longer be linked to this account.", confirm: "Remove Account", destructive: true }))) return;
+    await api(`/accounts/${a.id}`, { method: "DELETE" }); toast("Account removed"); refresh(); sheet.dismiss();
   }
   const preview: Account = { id: 0, kind: f.kind, bank: f.bank || null, name: f.name || "Account", cardType: f.cardType || null, last4: /^\d{4}$/.test(f.last4) ? f.last4 : null, currency: f.currency, theme: f.theme,
     balanceMinor: f.balance === originalBalance ? a?.balanceMinor ?? null : null, balanceAsOf: a?.balanceAsOf ?? null, balanceSource: a?.balanceSource ?? null };
   return (
-    <Sheet title={a ? "Account" : "New account"} onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} onClick={save}>Save</button>}>
+    <Sheet closeRef={sheet.ref} title={a ? "Account" : "New account"} onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} onClick={save}>Save</button>}>
       <div style={{ maxWidth: 340, margin: "0 auto", width: "100%" }}><WalletCard account={preview} /></div>
       <div className="row" style={{ justifyContent: "center", gap: 10 }} role="group" aria-label="Card colour">
         {THEMES.map((t) => <button key={t} aria-label={t} aria-pressed={f.theme === t} onClick={() => setF({ ...f, theme: t })} className={`pay-card ${t}`} style={{ width: 34, height: 34, aspectRatio: "1", borderRadius: 17, padding: 0, outline: f.theme === t ? "3px solid var(--accent)" : "none", outlineOffset: 2 }} />)}

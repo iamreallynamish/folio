@@ -5,7 +5,7 @@ import { CURRENCIES } from "../../shared/money.ts";
 import { fmtDate, formatMoney, slotColor } from "../format.ts";
 import { Icon } from "../ui/Icon.tsx";
 import { LogoMark } from "../ui/Logo.tsx";
-import { Field, Segmented, setTheme, Sheet, toast, useLoad } from "../ui/kit.tsx";
+import { Field, Segmented, setTheme, Sheet, toast, useLoad, useSheetClose, confirmAction } from "../ui/kit.tsx";
 import { CategorySheet } from "./Plan.tsx";
 
 export function Settings() {
@@ -25,7 +25,7 @@ export function Settings() {
     URL.revokeObjectURL(url);
   }
   async function deleteAccount() {
-    if (prompt("This permanently deletes your account and every record in it. Type DELETE to confirm.") !== "DELETE") return;
+    if (!(await confirmAction({ title: "Delete your account?", message: "This permanently deletes your account and every record in it. It cannot be undone.", confirm: "Delete Account", destructive: true, requireText: "DELETE" }))) return;
     await api("/me", { method: "DELETE" }); setUser(null);
   }
   const Row = ({ icon, tint, title, value, onClick }: { icon: string; tint: string; title: string; value?: string; onClick: () => void }) => (
@@ -132,17 +132,18 @@ export function Settings() {
 }
 
 function ProfileSheet({ onClose }: { onClose: () => void }) {
+  const sheet = useSheetClose(onClose);
   const { user, setUser, refresh } = useApp();
   const [name, setName] = useState(user.name), [base, setBase] = useState(user.baseCurrency), [error, setError] = useState("");
   async function save() {
     try {
       const body: any = { name, baseCurrency: base };
       if (base !== user.baseCurrency) body.monthlyBudget = null; // a budget in the old currency no longer applies
-      const r = await api("/me", { method: "PATCH", body }); setUser(r.user); refresh(); toast("Saved"); onClose();
+      const r = await api("/me", { method: "PATCH", body }); setUser(r.user); refresh(); toast("Saved"); sheet.dismiss();
     } catch (e: any) { setError(e.message); }
   }
   return (
-    <Sheet title="Profile" onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} onClick={save}>Save</button>}>
+    <Sheet closeRef={sheet.ref} title="Profile" onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} onClick={save}>Save</button>}>
       <Field label="Name"><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></Field>
       <Field label="Main currency for budgets"><select className="input" value={base} onChange={(e) => setBase(e.target.value)}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select></Field>
       {base !== user.baseCurrency && <p className="footnote muted">Changing the main currency clears your monthly budget; category limits keep their numbers and are read in {base}.</p>}
@@ -151,10 +152,11 @@ function ProfileSheet({ onClose }: { onClose: () => void }) {
   );
 }
 function PasswordSheet({ onClose }: { onClose: () => void }) {
+  const sheet = useSheetClose(onClose);
   const [current, setCurrent] = useState(""), [next, setNext] = useState(""), [error, setError] = useState("");
-  async function save() { try { await api("/me/password", { body: { current, next } }); toast("Password changed. Other devices were signed out."); onClose(); } catch (e: any) { setError(e.message); } }
+  async function save() { try { await api("/me/password", { body: { current, next } }); toast("Password changed. Other devices were signed out."); sheet.dismiss(); } catch (e: any) { setError(e.message); } }
   return (
-    <Sheet title="Change password" onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} onClick={save}>Save</button>}>
+    <Sheet closeRef={sheet.ref} title="Change password" onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} onClick={save}>Save</button>}>
       <Field label="Current password"><input className="input" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} /></Field>
       <Field label="New password (10 characters or more)"><input className="input" type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} /></Field>
       {error && <p className="error" role="alert">{error}</p>}
@@ -162,11 +164,12 @@ function PasswordSheet({ onClose }: { onClose: () => void }) {
   );
 }
 function KeySheet({ field, title, blurb, has, onClose }: { field: string; title: string; blurb: string; has: boolean; onClose: () => void }) {
+  const sheet = useSheetClose(onClose);
   const { setUser, refresh } = useApp();
   const [key, setKey] = useState(""), [error, setError] = useState("");
-  async function save(value: string | null) { try { const r = await api("/me/keys", { method: "PUT", body: { [field]: value } }); setUser(r.user); refresh(); toast(value ? "Key saved" : "Key removed"); onClose(); } catch (e: any) { setError(e.message); } }
+  async function save(value: string | null) { try { const r = await api("/me/keys", { method: "PUT", body: { [field]: value } }); setUser(r.user); refresh(); toast(value ? "Key saved" : "Key removed"); sheet.dismiss(); } catch (e: any) { setError(e.message); } }
   return (
-    <Sheet title={title} onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} disabled={!key.trim()} onClick={() => save(key)}>Save</button>}>
+    <Sheet closeRef={sheet.ref} title={title} onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} disabled={!key.trim()} onClick={() => save(key)}>Save</button>}>
       <p className="subhead muted">{blurb}</p>
       <Field label={has ? "Replace API key" : "API key"}><input className="input" type="password" autoComplete="off" value={key} onChange={(e) => setKey(e.target.value)} placeholder={has ? "A key is saved (hidden)" : "Paste your key"} /></Field>
       <p className="caption faint">The key is encrypted on the server and never shown again or sent to your browser.</p>

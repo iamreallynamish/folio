@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { api } from "../api.ts";
 import { useApp } from "../ctx.ts";
 import { fmtMonth, formatMoney, relTime, slotColor } from "../format.ts";
@@ -6,12 +6,35 @@ import { Icon } from "../ui/Icon.tsx";
 import { LogoMark } from "../ui/Logo.tsx";
 import { Empty, Skeleton, ThemeToggle, toast, useLoad, useMedia } from "../ui/kit.tsx";
 import { TxnRow } from "../ui/TxnRow.tsx";
+import { spring, SPRING, type SpringHandle } from "../ui/spring.ts";
 import { WalletCard } from "../ui/WalletCard.tsx";
 
 export function Home() {
   const { user, setUser, version, refresh, go, openTxn, openImport, openAccount } = useApp();
   const { data, error } = useLoad(() => api("/home"), [version]);
   const [front, setFront] = useState<number | null>(null);
+  // Card stack reorder animates with FLIP + springs: measure, reorder, then spring each card from
+  // where it was on screen (including mid-animation) to its new slot.
+  const slots = useRef(new Map<number, HTMLDivElement>());
+  const before = useRef<Map<number, number> | null>(null);
+  const moving = useRef(new Map<number, SpringHandle>());
+  const bringForward = (id: number) => {
+    before.current = new Map([...slots.current].map(([k, el]) => [k, el.getBoundingClientRect().top]));
+    setFront(id);
+  };
+  useLayoutEffect(() => {
+    const prev = before.current;
+    if (!prev) return;
+    before.current = null;
+    for (const [id, el] of slots.current) {
+      moving.current.get(id)?.stop();
+      el.style.transform = "";
+      const dy = (prev.get(id) ?? 0) - el.getBoundingClientRect().top;
+      if (!dy) continue;
+      el.style.transform = `translate3d(0, ${dy}px, 0)`;
+      moving.current.set(id, spring(dy, 0, SPRING.smooth, (v) => { el.style.transform = v ? `translate3d(0, ${v}px, 0)` : ""; }));
+    }
+  }, [front]);
   const stacked = useMedia("(max-width: 639px), (min-width: 1100px)");
   const first = user.name.split(" ")[0];
   const hour = new Date().getHours();
@@ -71,7 +94,11 @@ export function Home() {
         <div className={`wallet-stack ${stacked ? "stacked" : ""}`}>
           {ordered.map((a: any, i: number) => {
             const peek = stacked && i < ordered.length - 1;
-            return <WalletCard key={a.id} account={a} peek={peek} onClick={() => (peek ? setFront(a.id) : openAccount(a))} />;
+            return (
+              <div className="card-slot" key={a.id} ref={(el) => { if (el) slots.current.set(a.id, el); else slots.current.delete(a.id); }}>
+                <WalletCard account={a} peek={peek} onClick={() => (peek ? bringForward(a.id) : openAccount(a))} />
+              </div>
+            );
           })}
         </div>
         {cards.length === 0 && <div className="card"><Empty icon="card" title="No cards yet"><button className="btn tinted small" onClick={() => openAccount("new")}>Add a card</button></Empty></div>}

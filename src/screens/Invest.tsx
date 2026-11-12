@@ -5,7 +5,7 @@ import { CURRENCIES } from "../../shared/money.ts";
 import { fmtDate, pct, plain, relTime, signed, slotColor } from "../format.ts";
 import { LineChart, StackBar, type Segment } from "../ui/Charts.tsx";
 import { Icon } from "../ui/Icon.tsx";
-import { Empty, Field, Notice, Sheet, Skeleton, toast, useLoad } from "../ui/kit.tsx";
+import { Empty, Field, Notice, Sheet, Skeleton, toast, useLoad, useSheetClose, confirmAction } from "../ui/kit.tsx";
 
 const cls = (n: number | null) => (n == null || n === 0 ? "muted" : n > 0 ? "pos" : "neg");
 
@@ -175,6 +175,7 @@ function Contrib({ title, rows, field, pctField }: { title: string; rows: any[];
 }
 
 function HoldingSheet({ holding, hasKey, onClose }: { holding: any | "new"; hasKey: boolean; onClose: () => void }) {
+  const sheet = useSheetClose(onClose);
   const { refresh } = useApp();
   const h = holding === "new" ? null : holding;
   const [f, setF] = useState({ symbol: h?.symbol ?? "", name: h?.name ?? "", quantity: h ? String(h.quantity) : "", avgPrice: h ? String(h.avgPrice) : "", currency: h?.currency ?? "USD" });
@@ -188,11 +189,11 @@ function HoldingSheet({ holding, hasKey, onClose }: { holding: any | "new"; hasK
     return () => clearTimeout(t);
   }, [q, hasKey]);
   async function save() {
-    try { await api(h ? `/holdings/${h.id}` : "/holdings", { method: h ? "PATCH" : "POST", body: f }); refresh(); toast("Holding saved"); onClose(); } catch (e: any) { setError(e.message); }
+    try { await api(h ? `/holdings/${h.id}` : "/holdings", { method: h ? "PATCH" : "POST", body: f }); refresh(); toast("Holding saved"); sheet.dismiss(); } catch (e: any) { setError(e.message); }
   }
-  async function remove() { if (!confirm(`Remove ${h.symbol}?`)) return; await api(`/holdings/${h.id}`, { method: "DELETE" }); refresh(); toast("Holding removed"); onClose(); }
+  async function remove() { if (!(await confirmAction({ title: `Remove ${h.symbol}?`, message: "Your quantity and purchase price for this holding will be deleted.", confirm: "Remove Holding", destructive: true }))) return; await api(`/holdings/${h.id}`, { method: "DELETE" }); refresh(); toast("Holding removed"); sheet.dismiss(); }
   return (
-    <Sheet title={h ? h.symbol : "New holding"} onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} onClick={save}>Save</button>}>
+    <Sheet closeRef={sheet.ref} title={h ? h.symbol : "New holding"} onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} onClick={save}>Save</button>}>
       {!h && hasKey && (
         <>
           <div className="search"><Icon name="search" /><input className="input" type="search" placeholder="Search company or ticker" value={q} onChange={(e) => setQ(e.target.value)} autoFocus aria-label="Search symbols" /></div>

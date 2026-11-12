@@ -3,7 +3,7 @@ import { api, type Account, type Category, type Txn, type User } from "./api.ts"
 import { Ctx, type Tab } from "./ctx.ts";
 import { Icon } from "./ui/Icon.tsx";
 import { LogoMark } from "./ui/Logo.tsx";
-import { ToastHost } from "./ui/kit.tsx";
+import { ConfirmHost, ToastHost } from "./ui/kit.tsx";
 import { Auth } from "./screens/Auth.tsx";
 import { Home } from "./screens/Home.tsx";
 import { Activity } from "./screens/Activity.tsx";
@@ -78,6 +78,7 @@ export function App() {
       {txn && <TxnSheet txn={txn} onClose={() => setTxn(null)} />}
       {importing && <ImportSheet initialText={importing.text} onClose={() => setImporting(null)} />}
       {account && <AccountSheet account={account} onClose={() => setAccount(null)} />}
+      <ConfirmHost />
       <ToastHost />
     </Ctx.Provider>
   );

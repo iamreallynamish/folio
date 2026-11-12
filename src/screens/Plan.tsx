@@ -5,7 +5,7 @@ import { CURRENCIES, fromMinor } from "../../shared/money.ts";
 import { fmtDate, fmtMonth, fmtMonthShort, formatMoney, slotColor, todayIso } from "../format.ts";
 import { BarChart, Donut, LineChart, type Segment } from "../ui/Charts.tsx";
 import { Icon, ICON_CHOICES } from "../ui/Icon.tsx";
-import { Empty, Field, MonthNav, Notice, Provenance, Ring, Segmented, Sheet, Skeleton, toast, useLoad } from "../ui/kit.tsx";
+import { Empty, Field, MonthNav, Notice, Provenance, Ring, Segmented, Sheet, Skeleton, toast, useLoad, useSheetClose, confirmAction } from "../ui/kit.tsx";
 
 export function Plan() {
   const [view, setView] = useState<"budget" | "income">(() => (sessionStorage.getItem("folio-plan") as any) ?? "budget");
@@ -152,16 +152,17 @@ function Budget() {
 }
 
 function BudgetSheet({ onClose }: { onClose: () => void }) {
+  const sheet = useSheetClose(onClose);
   const { user, setUser, refresh } = useApp();
   const [budget, setBudget] = useState(user.monthlyBudgetMinor != null ? String(fromMinor(user.monthlyBudgetMinor, user.baseCurrency)) : "");
   const [th, setTh] = useState(user.alertThreshold);
   const [error, setError] = useState("");
   async function save() {
-    try { const r = await api("/me", { method: "PATCH", body: { monthlyBudget: budget === "" ? null : budget, alertThreshold: th } }); setUser(r.user); refresh(); toast("Budget saved"); onClose(); }
+    try { const r = await api("/me", { method: "PATCH", body: { monthlyBudget: budget === "" ? null : budget, alertThreshold: th } }); setUser(r.user); refresh(); toast("Budget saved"); sheet.dismiss(); }
     catch (e: any) { setError(e.message); }
   }
   return (
-    <Sheet title="Monthly budget" onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} onClick={save}>Save</button>}>
+    <Sheet closeRef={sheet.ref} title="Monthly budget" onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} onClick={save}>Save</button>}>
       <Field label={`Fixed budget each month (${user.baseCurrency})`}><input className="input num" inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="No budget" autoFocus /></Field>
       <Field label={`Warn me when I have used ${th}%`}><input type="range" min={50} max={100} step={5} value={th} onChange={(e) => setTh(Number(e.target.value))} style={{ accentColor: "var(--accent)", height: 44 }} /></Field>
       <p className="footnote muted">Alerts appear on Home and here when you approach or pass the monthly budget or any category budget.</p>
@@ -171,21 +172,22 @@ function BudgetSheet({ onClose }: { onClose: () => void }) {
 }
 
 export function CategorySheet({ category, onClose }: { category: Category | "new"; onClose: () => void }) {
+  const sheet = useSheetClose(onClose);
   const { user, refresh } = useApp();
   const c = category === "new" ? null : category;
   const [f, setF] = useState({ name: c?.name ?? "", icon: c?.icon ?? "dots", slot: c?.slot ?? 0, budget: c?.budgetMinor != null ? String(fromMinor(c.budgetMinor, user.baseCurrency)) : "" });
   const [error, setError] = useState("");
   const locked = c && ["uncategorised", "topup", "transfer"].includes(c.key ?? "");
   async function save() {
-    try { await api(c ? `/categories/${c.id}` : "/categories", { method: c ? "PATCH" : "POST", body: { ...f, budget: f.budget === "" ? null : f.budget } }); refresh(); toast("Category saved"); onClose(); }
+    try { await api(c ? `/categories/${c.id}` : "/categories", { method: c ? "PATCH" : "POST", body: { ...f, budget: f.budget === "" ? null : f.budget } }); refresh(); toast("Category saved"); sheet.dismiss(); }
     catch (e: any) { setError(e.message); }
   }
   async function remove() {
-    if (!c || !confirm(`Delete “${c.name}”? Its transactions move to Uncategorised.`)) return;
-    try { await api(`/categories/${c.id}`, { method: "DELETE" }); refresh(); toast("Category deleted"); onClose(); } catch (e: any) { setError(e.message); }
+    if (!c || !(await confirmAction({ title: `Delete “${c.name}”?`, message: "Its transactions move to Uncategorised.", confirm: "Delete Category", destructive: true }))) return;
+    try { await api(`/categories/${c.id}`, { method: "DELETE" }); refresh(); toast("Category deleted"); sheet.dismiss(); } catch (e: any) { setError(e.message); }
   }
   return (
-    <Sheet title={c ? "Category" : "New category"} onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} onClick={save}>Save</button>}>
+    <Sheet closeRef={sheet.ref} title={c ? "Category" : "New category"} onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} onClick={save}>Save</button>}>
       <Field label="Name"><input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} autoFocus={!c} /></Field>
       {c?.kind !== "transfer" && <Field label={`Monthly limit (${user.baseCurrency})`}><input className="input num" inputMode="decimal" value={f.budget} onChange={(e) => setF({ ...f, budget: e.target.value })} placeholder="No limit" /></Field>}
       <div className="field"><span>Icon</span>
@@ -212,7 +214,7 @@ function Income() {
   if (error) return <p className="error">{error}</p>;
   if (!data) return <Skeleton h={240} />;
   async function removeSource(s: any) {
-    if (!confirm(`Delete “${s.name}” and its payment schedule?`)) return;
+    if (!(await confirmAction({ title: `Delete “${s.name}”?`, message: "Its payment schedule and received amounts are deleted too.", confirm: "Delete Income", destructive: true }))) return;
     await api(`/income/sources/${s.id}`, { method: "DELETE" }); refresh(); toast("Income source deleted");
   }
   return (
@@ -285,15 +287,16 @@ function Income() {
 }
 
 function SourceSheet({ onClose }: { onClose: () => void }) {
+  const sheet = useSheetClose(onClose);
   const { user, refresh } = useApp();
   const [f, setF] = useState({ kind: "scholarship", name: "", currency: user.baseCurrency, recurrence: "monthly", amount: "", firstDate: "", occurrences: "12" });
   const [error, setError] = useState("");
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
   async function save() {
-    try { await api("/income/sources", { body: f }); refresh(); toast("Income added"); onClose(); } catch (e: any) { setError(e.message); }
+    try { await api("/income/sources", { body: f }); refresh(); toast("Income added"); sheet.dismiss(); } catch (e: any) { setError(e.message); }
   }
   return (
-    <Sheet title="New income" onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} onClick={save}>Add</button>}>
+    <Sheet closeRef={sheet.ref} title="New income" onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} onClick={save}>Add</button>}>
       <Field label="Type"><select className="input" value={f.kind} onChange={set("kind")}>{Object.entries(KIND).map(([k, [l]]) => <option key={k} value={k}>{l}</option>)}</select></Field>
       <Field label="Name"><input className="input" value={f.name} onChange={set("name")} placeholder={f.kind === "scholarship" ? "Name of the scholarship" : "e.g. Monthly allowance"} autoFocus /></Field>
       <div className="form-row" style={{ gridTemplateColumns: "1fr 110px" }}>
@@ -312,18 +315,19 @@ function SourceSheet({ onClose }: { onClose: () => void }) {
 }
 
 function PaymentSheet({ source, payment, onClose }: { source: any; payment: any | null; onClose: () => void }) {
+  const sheet = useSheetClose(onClose);
   const { refresh } = useApp();
   const amt = (n: number) => (n ? String(fromMinor(n, source.currency)) : "");
   const [f, setF] = useState({ expectedDate: payment?.expectedDate ?? "", expected: amt(payment?.expectedMinor ?? 0), received: amt(payment?.receivedMinor ?? 0), receivedDate: payment?.receivedDate ?? "", note: payment?.note ?? "" });
   const [error, setError] = useState("");
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   async function save(body: any = f) {
-    try { await api(payment ? `/income/payments/${payment.id}` : "/income/payments", { method: payment ? "PATCH" : "POST", body: { ...body, sourceId: source.id } }); refresh(); toast("Saved"); onClose(); }
+    try { await api(payment ? `/income/payments/${payment.id}` : "/income/payments", { method: payment ? "PATCH" : "POST", body: { ...body, sourceId: source.id } }); refresh(); toast("Saved"); sheet.dismiss(); }
     catch (e: any) { setError(e.message); }
   }
-  async function remove() { await api(`/income/payments/${payment.id}`, { method: "DELETE" }); refresh(); toast("Payment deleted"); onClose(); }
+  async function remove() { await api(`/income/payments/${payment.id}`, { method: "DELETE" }); refresh(); toast("Payment deleted"); sheet.dismiss(); }
   return (
-    <Sheet title={source.name} onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} onClick={() => save()}>Save</button>}>
+    <Sheet closeRef={sheet.ref} title={source.name} onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} onClick={() => save()}>Save</button>}>
       <div className="form-row">
         <Field label={`Expected (${source.currency})`}><input className="input num" inputMode="decimal" value={f.expected} onChange={set("expected")} placeholder="0" /></Field>
         <Field label="Expected date"><input className="input" type="date" value={f.expectedDate} onChange={set("expectedDate")} /></Field>

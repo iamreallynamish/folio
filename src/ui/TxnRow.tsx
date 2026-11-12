@@ -1,6 +1,7 @@
 import type { Txn } from "../api.ts";
 import { fmtShort, formatMoney, slotColor } from "../format.ts";
 import { Icon } from "./Icon.tsx";
+import { useHidden } from "./kit.tsx";
 
 export function txnIcon(t: Txn) {
   if (t.type === "income") return "in";
@@ -25,6 +26,7 @@ export function txnCard(t: Txn) {
 
 /** One line in the feed: merchant, category, card, date and amount. */
 export function TxnRow({ t, onClick, showDate = true }: { t: Txn; onClick: () => void; as?: "cell" | "note"; showDate?: boolean }) {
+  if (useHidden(t.id)) return null;
   const tint = t.type === "income" || t.type === "refund" ? "var(--positive)" : slotColor(t.type === "transfer" ? 0 : t.categorySlot);
   const when = [showDate && fmtShort(t.date), t.time && `${t.time.slice(0, 5)}${t.tz ? ` ${t.tz}` : ""}`].filter(Boolean).join(" · ");
   return (

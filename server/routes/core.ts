@@ -75,7 +75,7 @@ core.post("/review", h(async (req, res) => {
 }));
 
 // ---------- accounts ----------
-const THEMES = ["graphite", "ember", "plum", "ocean", "mint", "sand"];
+const THEMES = ["icici-student", "axis-privilege", "graphite", "ember", "plum", "ocean", "mint", "sand"];
 const accountOut = (a: any) => ({
   id: a.id, kind: a.kind, bank: a.bank, name: a.name, cardType: a.card_type, last4: a.last4, currency: a.currency,
   balanceMinor: a.balance_minor, balanceAsOf: a.balance_as_of, balanceSource: a.balance_source, theme: a.theme,
