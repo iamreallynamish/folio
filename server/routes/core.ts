@@ -84,8 +84,15 @@ const THEMES = ["icici-student", "axis-privilege", "graphite", "ember", "plum", 
 const accountOut = (a: any) => ({
   id: a.id, kind: a.kind, bank: a.bank, name: a.name, cardType: a.card_type, last4: a.last4, currency: a.currency,
   balanceMinor: a.balance_minor, balanceAsOf: a.balance_as_of, balanceSource: a.balance_source, theme: a.theme,
+  cardLine: a.card_line ?? "auto", statementDay: a.statement_day ?? null, dueDay: a.due_day ?? null,
+  // The later of the date you set and the last money added to the card (a top-up or transfer in).
+  lastTopup: [a.last_topup, a.last_in].filter(Boolean).sort().pop() ?? null,
 });
-export const listAccounts = async (userId: number) => (await all("SELECT * FROM accounts WHERE user_id = ? ORDER BY kind != 'card', id", userId)).map(accountOut);
+const ACCOUNT_SELECT = `SELECT a.*, (SELECT MAX(t.date) FROM transactions t WHERE t.user_id = a.user_id AND
+  ((t.type = 'income' AND t.account_id = a.id) OR (t.type = 'transfer' AND t.transfer_account_id = a.id))) AS last_in
+  FROM accounts a`;
+export const listAccounts = async (userId: number) => (await all(`${ACCOUNT_SELECT} WHERE a.user_id = ? ORDER BY a.kind != 'card', a.id`, userId)).map(accountOut);
+const oneAccount = async (id: number) => accountOut(await get(`${ACCOUNT_SELECT} WHERE a.id = ?`, id));
 core.get("/accounts", h(async (req, res) => res.json({ accounts: await listAccounts(req.user.id) })));
 function accountFields(b: any, prev?: any) {
   const kind = b.kind ?? prev?.kind ?? "card";
@@ -100,14 +107,24 @@ function accountFields(b: any, prev?: any) {
     cardType: b.cardType !== undefined ? String(b.cardType ?? "").trim().slice(0, 40) || null : prev?.card_type ?? null,
     currency: b.currency !== undefined ? ccy(b.currency) : prev?.currency ?? "JPY",
     theme: THEMES.includes(b.theme) ? b.theme : prev?.theme ?? "graphite",
+    cardLine: ["auto", "cycle", "topup", "updated"].includes(b.cardLine) ? b.cardLine : prev?.card_line ?? "auto",
+    statementDay: b.statementDay !== undefined ? day(b.statementDay) : prev?.statement_day ?? null,
+    dueDay: b.dueDay !== undefined ? day(b.dueDay) : prev?.due_day ?? null,
+    lastTopup: b.lastTopup !== undefined ? (b.lastTopup ? dateOk(b.lastTopup) : null) : prev?.last_topup ?? null,
   };
+}
+/** A day of the month, 1–31, or none. */
+function day(v: unknown): number | null {
+  if (v === null || v === "") return null;
+  const n = Math.trunc(Number(v));
+  return n >= 1 && n <= 31 ? n : bad("Choose a day of the month between 1 and 31.");
 }
 core.post("/accounts", h(async (req, res) => {
   const f = accountFields(req.body);
-  const id = await insert("INSERT INTO accounts(user_id,kind,bank,name,card_type,last4,currency,theme,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
-    req.user.id, f.kind, f.bank, f.name, f.cardType, f.last4, f.currency, f.theme, now());
+  const id = await insert("INSERT INTO accounts(user_id,kind,bank,name,card_type,last4,currency,theme,card_line,statement_day,due_day,last_topup,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    req.user.id, f.kind, f.bank, f.name, f.cardType, f.last4, f.currency, f.theme, f.cardLine, f.statementDay, f.dueDay, f.lastTopup, now());
   await setBalance(id, req.body.balance, f.currency);
-  res.status(201).json({ account: accountOut(await get("SELECT * FROM accounts WHERE id = ?", id)) });
+  res.status(201).json({ account: await oneAccount(id) });
 }));
 async function setBalance(id: number, value: unknown, currency: string) {
   if (value === undefined) return;
@@ -121,9 +138,10 @@ async function setBalance(id: number, value: unknown, currency: string) {
 core.patch("/accounts/:id", h(async (req, res) => {
   const a = await owned("accounts", req.params.id, req.user.id);
   const f = accountFields(req.body, a);
-  await run("UPDATE accounts SET kind=?, bank=?, name=?, card_type=?, last4=?, currency=?, theme=? WHERE id=?", f.kind, f.bank, f.name, f.cardType, f.last4, f.currency, f.theme, a.id);
+  await run("UPDATE accounts SET kind=?, bank=?, name=?, card_type=?, last4=?, currency=?, theme=?, card_line=?, statement_day=?, due_day=?, last_topup=? WHERE id=?",
+    f.kind, f.bank, f.name, f.cardType, f.last4, f.currency, f.theme, f.cardLine, f.statementDay, f.dueDay, f.lastTopup, a.id);
   await setBalance(a.id, req.body.balance, f.currency);
-  res.json({ account: accountOut(await get("SELECT * FROM accounts WHERE id = ?", a.id)) });
+  res.json({ account: await oneAccount(a.id) });
 }));
 core.delete("/accounts/:id", h(async (req, res) => {
   const a = await owned("accounts", req.params.id, req.user.id);

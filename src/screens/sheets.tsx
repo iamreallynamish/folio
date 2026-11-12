@@ -353,12 +353,17 @@ export function AccountSheet({ account, onClose }: { account: Account | "new"; o
   const [f, setF] = useState({
     kind: a?.kind ?? "card", bank: a?.bank ?? "", name: a?.name ?? "", cardType: a?.cardType ?? "", last4: a?.last4 ?? "", currency: a?.currency ?? user.baseCurrency,
     theme: a?.theme ?? "graphite", balance: a?.balanceMinor != null ? String(fromMinor(a.balanceMinor, a.currency)) : "",
+    cardLine: a?.cardLine ?? "auto", statementDay: a?.statementDay ? String(a.statementDay) : "", dueDay: a?.dueDay ? String(a.dueDay) : "", lastTopup: a?.lastTopup ?? "",
   });
+  const credit = /credit/i.test(f.cardType), prepaid = /prepaid|forex/i.test(f.cardType) || f.kind === "wallet";
+  const showCycle = f.cardLine === "cycle" || (f.cardLine === "auto" && (credit || !!f.statementDay));
+  const showTopup = f.cardLine === "topup" || (f.cardLine === "auto" && prepaid);
+  const DAYS = Array.from({ length: 31 }, (_, i) => String(i + 1));
   const [error, setError] = useState("");
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
   const originalBalance = a?.balanceMinor != null ? String(fromMinor(a.balanceMinor, a.currency)) : "";
   async function save() {
-    const body: any = { ...f, name: f.name || [f.bank, f.cardType].filter(Boolean).join(" ") };
+    const body: any = { ...f, name: f.name || [f.bank, f.cardType].filter(Boolean).join(" "), statementDay: f.statementDay || null, dueDay: f.dueDay || null, lastTopup: f.lastTopup || null };
     if (f.balance === originalBalance) delete body.balance; else body.balance = f.balance === "" ? null : f.balance;
     try { await api(a ? `/accounts/${a.id}` : "/accounts", { method: a ? "PATCH" : "POST", body }); toast("Saved"); refresh(); sheet.dismiss(); }
     catch (e: any) { setError(e.message); }
@@ -368,7 +373,8 @@ export function AccountSheet({ account, onClose }: { account: Account | "new"; o
     await api(`/accounts/${a.id}`, { method: "DELETE" }); toast("Account removed"); refresh(); sheet.dismiss();
   }
   const preview: Account = { id: 0, kind: f.kind, bank: f.bank || null, name: f.name || "Account", cardType: f.cardType || null, last4: /^\d{4}$/.test(f.last4) ? f.last4 : null, currency: f.currency, theme: f.theme,
-    balanceMinor: f.balance === originalBalance ? a?.balanceMinor ?? null : null, balanceAsOf: a?.balanceAsOf ?? null, balanceSource: a?.balanceSource ?? null };
+    balanceMinor: f.balance === originalBalance ? a?.balanceMinor ?? null : null, balanceAsOf: a?.balanceAsOf ?? null, balanceSource: a?.balanceSource ?? null,
+    cardLine: f.cardLine as any, statementDay: f.statementDay ? Number(f.statementDay) : null, dueDay: f.dueDay ? Number(f.dueDay) : null, lastTopup: f.lastTopup || null };
   return (
     <Sheet closeRef={sheet.ref} title={a ? "Account" : "New account"} onClose={onClose} action={<button className="btn plain" style={{ fontWeight: 700 }} onClick={save}>Save</button>}>
       <div style={{ maxWidth: 340, margin: "0 auto", width: "100%" }}><WalletCard account={preview} /></div>
@@ -385,6 +391,25 @@ export function AccountSheet({ account, onClose }: { account: Account | "new"; o
         <Field label="Last four digits"><input className="input num" inputMode="numeric" maxLength={4} value={f.last4} onChange={(e) => setF({ ...f, last4: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="0000" /></Field>
         <Field label="Currency"><select className="input" value={f.currency} onChange={set("currency")}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select></Field>
       </div>
+      {(f.kind === "card" || f.kind === "wallet") && (
+        <div className="card stack" style={{ gap: 12 }}>
+          <Segmented label="Show on card" value={f.cardLine} onChange={(v) => setF({ ...f, cardLine: v })}
+            options={[{ value: "auto", label: "Auto" }, { value: "cycle", label: "Billing cycle" }, { value: "topup", label: "Last top-up" }, { value: "updated", label: "Balance" }]} />
+          {showCycle && (
+            <div className="form-row">
+              <Field label="Statement day"><select className="input" value={f.statementDay} onChange={set("statementDay")}><option value="">Not set</option>{DAYS.map((d) => <option key={d} value={d}>{d}</option>)}</select></Field>
+              <Field label="Payment due day"><select className="input" value={f.dueDay} onChange={set("dueDay")}><option value="">Not set</option>{DAYS.map((d) => <option key={d} value={d}>{d}</option>)}</select></Field>
+            </div>
+          )}
+          {showTopup && <Field label="Last top-up"><input className="input" type="date" value={f.lastTopup} onChange={set("lastTopup")} /></Field>}
+          <p className="caption faint" style={{ margin: 0 }}>
+            {f.cardLine === "auto" ? "Automatic shows the billing cycle once a statement day is set, the last top-up for prepaid and forex cards, and otherwise when the balance was last updated."
+              : showCycle ? "The cycle closes on the statement day each month; the payment is due on the due day after it."
+              : showTopup ? "Money added to this card (a transfer in or money received) also updates the date automatically."
+              : "Shows when the balance was last updated, and whether it came from a bank message."}
+          </p>
+        </div>
+      )}
       <Field label="Balance (leave empty if you don't know it)"><input className="input num" inputMode="decimal" value={f.balance} onChange={set("balance")} placeholder="Unknown" /></Field>
       <p className="caption faint" style={{ marginTop: -8, paddingLeft: 4 }}>Folio matches bank messages to this account by its last four digits and never asks for the full number or CVV.</p>
       {error && <p className="error" role="alert">{error}</p>}

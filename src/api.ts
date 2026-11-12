@@ -17,7 +17,8 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
 }
 
 export interface User { id: number; email: string; name: string; baseCurrency: string; monthlyBudgetMinor: number | null; alertThreshold: number; lastReviewedAt: string; hasMarketKey: boolean; hasAssistantKey: boolean; hasIngestToken: boolean; onboarded: boolean; tourStep: number }
-export interface Account { id: number; kind: string; bank: string | null; name: string; cardType: string | null; last4: string | null; currency: string; balanceMinor: number | null; balanceAsOf: string | null; balanceSource: string | null; theme: string }
+export interface Account { id: number; kind: string; bank: string | null; name: string; cardType: string | null; last4: string | null; currency: string; balanceMinor: number | null; balanceAsOf: string | null; balanceSource: string | null; theme: string;
+  /** What the card shows under its balance. */ cardLine?: "auto" | "cycle" | "topup" | "updated"; statementDay?: number | null; dueDay?: number | null; lastTopup?: string | null }
 export interface Category { id: number; key: string | null; name: string; icon: string; slot: number; kind: string; budgetMinor: number | null }
 export interface Txn {
   id: number; type: "expense" | "income" | "refund" | "transfer"; amountMinor: number; currency: string; date: string; time: string | null; tz: string | null; dateInferred: boolean;

@@ -262,3 +262,17 @@ test("a purchase typed in at an ATM is recorded as a withdrawal", async () => {
   assert.equal(r.body.transaction.type, "transfer");
   assert.equal(r.body.transaction.categoryKey, "cash");
 });
+
+test("card line settings: billing cycle days and last top-up (set, or from money added)", async () => {
+  const accts = (await D("GET", "/accounts")).body.accounts;
+  const axis = accts.find((a: any) => a.last4 === "7117"), icici = accts.find((a: any) => a.last4 === "0817");
+  const a = (await D("PATCH", `/accounts/${axis.id}`, { cardLine: "cycle", statementDay: 15, dueDay: 5 })).body.account;
+  assert.deepEqual([a.cardLine, a.statementDay, a.dueDay], ["cycle", 15, 5]);
+  assert.equal((await D("PATCH", `/accounts/${axis.id}`, { statementDay: 32 })).status, 400);
+  const i = (await D("PATCH", `/accounts/${icici.id}`, { cardLine: "topup", lastTopup: "2026-10-20" })).body.account;
+  assert.equal(i.lastTopup, "2026-10-20");
+  // Money transferred onto the card later moves the date forward by itself.
+  await D("POST", "/transactions", { type: "transfer", amount: "50000", currency: "JPY", date: "2026-11-08", merchant: "Forex reload", transferAccountId: icici.id });
+  const after = (await D("GET", "/accounts")).body.accounts.find((x: any) => x.id === icici.id);
+  assert.equal(after.lastTopup, "2026-11-08");
+});
