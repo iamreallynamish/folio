@@ -240,7 +240,7 @@ export function ImportSheet({ initialText, onClose }: { initialText?: string; on
     setBusy(true);
     try {
       const r = await api("/sms/import", { body: payload });
-      toast(`${r.imported} added${r.duplicates ? ` · ${r.duplicates} duplicate${r.duplicates > 1 ? "s" : ""} skipped` : ""}${r.ignored ? ` · ${r.ignored} ignored` : ""}`);
+      toast(`${r.imported} added${r.duplicates ? ` · ${r.duplicates} duplicate${r.duplicates > 1 ? "s" : ""} skipped` : ""}${r.ignored ? ` · ${r.ignored} ignored` : ""}${r.recategorised ? ` · ${r.recategorised} earlier recategorised` : ""}`);
       refresh(); sheet.dismiss();
     } catch (e: any) { setError(e.message); } finally { setBusy(false); }
   }

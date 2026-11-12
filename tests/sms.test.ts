@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseSms, splitMessages, SAMPLE_MESSAGES } from "../shared/sms.ts";
 import { identifyMerchant } from "../shared/merchants.ts";
+import { readFileSync } from "node:fs";
 import { toMinor, formatMoney, convertMinor } from "../shared/money.ts";
 
 test("ICICI forex card at NITORI", () => {
@@ -126,4 +127,49 @@ test("money maths", () => {
   assert.equal(formatMoney(63756, "JPY"), "¥63,756");
   assert.equal(formatMoney(-49900, "INR"), "−₹499.00");
   assert.equal(convertMinor(10000, "INR", "JPY", 1.8), 180);
+});
+
+// The user's own October 2026 messages, exactly as pasted (line breaks, trailing "0.", cut-off names).
+test("real Axis and ICICI alerts: every message is a transaction with the right merchant", () => {
+  const msgs = splitMessages(readFileSync(new URL("./fixtures-user-oct26.txt", import.meta.url), "utf8"));
+  assert.equal(msgs.length, 20);
+  const got = msgs.map((m) => parseSms(m));
+  for (const p of got) assert.equal(p.class, "transaction", p.raw);
+  const names = got.map((p) => p.merchant?.name ?? null);
+  assert.deepEqual(names, [
+    "Don Quijote", "Mobile Suica", "7-Eleven", "7-Eleven", null, "Mobile Suica", "7-Eleven", "MaxValu", "7-Eleven", "7-Eleven",
+    "FamilyMart", "7-Eleven", "7-Eleven", "7-Eleven", "Ito-Yokado", "Uniqlo", "Ito-Yokado", "McDonald's", "Mobile Suica", "7-Eleven",
+  ]);
+  // Axis "using … Credit Card no. XX7117 on 24-10-26 21:48:36 IST at SEVEN-ELEVE."
+  const axis = got[2];
+  assert.equal(axis.amountMinor, 494);
+  assert.equal(axis.date, "2026-10-24");
+  assert.equal(axis.time, "21:48:36");
+  assert.equal(axis.bank, "Axis Bank");
+  assert.equal(axis.instrument, "Credit Card");
+  assert.equal(axis.last4, "7117");
+  assert.equal(axis.merchant?.category, "groceries");
+  assert.equal(axis.merchant?.match, "truncated");
+  assert.equal(axis.balanceMinor, undefined, "Axis states no balance; none invented");
+  // Suica top-ups are money moved into a wallet, not spending.
+  assert.equal(got[1].type, "transfer");
+  assert.equal(got[1].merchant?.wallet, "Mobile Suica");
+  // ICICI "transacted at POS … Bal JPY 86,191.00": a purchase with no shop named — kept, flagged for review.
+  assert.equal(got[4].amountMinor, 226);
+  assert.equal(got[4].balanceMinor, 86191);
+  assert.equal(got[4].needsReview, true);
+  // ICICI balance with a stray trailing "0." is read correctly.
+  assert.equal(got[6].balanceMinor, 85889);
+});
+
+test("misspelled and cut-off merchant names are recognised; lookalikes are not", () => {
+  const yes: [string, string][] = [
+    ["7-ELEV", "7-Eleven"], ["SEVEN-ELEVE", "7-Eleven"], ["SEVN-ELEVEN", "7-Eleven"], ["MOBILE SUIC", "Mobile Suica"],
+    ["7 MOBILE SUIC", "Mobile Suica"], ["MOBILE SUCIA", "Mobile Suica"], ["FAMILYMRT", "FamilyMart"], ["LAWSN", "Lawson"],
+    ["DONQUIJOTE", "Don Quijote"], ["MCDONALD S", "McDonald's"], ["STARBUKS", "Starbucks"], ["UNIQLO.CO", "Uniqlo"],
+    ["ITOYOKADO", "Ito-Yokado"], ["MAXVALU KOMENOKI", "MaxValu"], ["BICCAMRA", "Bic Camera"], ["UBER* EATS PENDING", "Uber Eats"],
+  ];
+  for (const [raw, name] of yes) assert.equal(identifyMerchant(raw).name, name, raw);
+  for (const raw of ["MOTION GYM", "TOKYO", "SMITH M", "SEVEN", "MOBILE", "STEAMY HOT POT", "LIFESTYLE CO", "GRABBER", "ANAND SWEETS"])
+    assert.equal(identifyMerchant(raw).known, false, raw);
 });

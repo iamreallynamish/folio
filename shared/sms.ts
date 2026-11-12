@@ -111,7 +111,7 @@ const OTP_RE = /\b(otp|one[\s-]?time\s*pass(word|code)|verification code|securit
 const FAILED_RE = /\b(declined|failed|unsuccessful|could not be processed|not processed|was not completed|has been blocked|is blocked)\b/i;
 const REMINDER_RE = /\b(is due|due on|due date|payment due|will be (auto[\s-]?)?(debited|deducted|charged)|minimum (amount )?due|bill (of|for).*generated|statement (is|for).*(ready|generated)|requested)\b/i;
 const PROMO_RE = /\b(offer|cashback up to|discount|pre[\s-]?approved|apply now|limited period|t&c|t & c|click here|upgrade (now|to)|win|voucher|reward points? (worth|of)|emi (at|starting)|loan (of|up ?to)|get up ?to|congratulations|exclusive)\b|https?:\/\/|\bbit\.ly\b/i;
-const DEBIT_RE = /\b(debited|spent|purchase|paid|payment of|withdrawn|withdrawal|has been made|txn of|transaction of|charged|deducted|used (for|at)|sent)\b/i;
+const DEBIT_RE = /\b(debited|spent|purchase|paid|payment of|withdrawn|withdrawal|has been made|txn of|transaction of|charged|deducted|used (for|at)|sent|transacted)\b|\busing\s+(?:your\s+)?[\w\s.]{0,40}?\bcard\b/i;
 const CREDIT_RE = /\b(credited|received|deposited|refund(ed)?|reversal|reversed|cashback (of|credited))\b/i;
 const REFUND_RE = /\b(refund(ed)?|reversal|reversed|chargeback)\b/i;
 const BALANCE_RE = /\b(avl\.?|avbl\.?|available|current|closing|total|net)?\s*\bbal(ance)?\b/i;
@@ -135,12 +135,14 @@ function findInstrument(text: string): string | undefined {
   return undefined;
 }
 
-const STOP = String.raw`(?=\s+on\s+\d|\s+dated\b|\s+at\s+\d|\s*[.;(]|\s+via\b|\s+using\b|\s+ref\b|\s+upi\b|\s+avl\b|\s+avbl\b|\s+available\b|\s+bal\b|\s+txn\b|\s*-\s*|$)`;
+const STOP = String.raw`(?=\s+on\s+\d|\s+dated\b|\s+at\s+\d|\s*[.;(]|\s+via\b|\s+using\b|\s+ref\b|\s+upi\b|\s+avl\b|\s+avbl\b|\s+available\b|\s+bal\b|\s+txn\b|\s+-\s+|$)`;
 function cleanMerchant(s: string | undefined): string | undefined {
   if (!s) return undefined;
   const t = s.replace(/\s+/g, " ").replace(/^[\s:,-]+|[\s:,.-]+$/g, "").trim();
   if (!t || t.length > 60) return undefined;
   if (/^(your|ur|a\/c|acct?|account|card|bank|the bank|\d+$)/i.test(t)) return undefined;
+  // "transacted at POS": the bank named the terminal, not the shop.
+  if (/^(pos|pos txn|pos terminal|merchant|online|e-?com(merce)?)$/i.test(t)) return undefined;
   return t;
 }
 
@@ -236,12 +238,22 @@ export function parseSms(input: string, fallbackDate?: string): ParsedSms {
   };
 }
 
-/** Split pasted text into messages: blank lines separate, otherwise one per line. */
+/**
+ * Split pasted text into messages. Blank lines separate messages; without them, each line that states an
+ * amount starts a new message and lines without one continue the message above. Axis puts the merchant on
+ * its own line ("… 21:02:52 IST at" / "SEVEN-ELEVE."), which must stay with its message.
+ */
 export function splitMessages(text: string): string[] {
   const t = text.replace(/\r\n?/g, "\n").trim();
   if (!t) return [];
-  const blocks = /\n\s*\n/.test(t) ? t.split(/\n\s*\n+/) : t.split("\n");
-  return blocks.map(normaliseSms).filter(Boolean);
+  if (/\n\s*\n/.test(t)) return t.split(/\n\s*\n+/).map(normaliseSms).filter(Boolean);
+  const out: string[] = [];
+  for (const line of t.split("\n")) {
+    if (!line.trim()) continue;
+    if (out.length && findAmounts(line).length === 0) out[out.length - 1] += " " + line;
+    else out.push(line);
+  }
+  return out.map(normaliseSms).filter(Boolean);
 }
 
 /** Read messages from an "SMS Backup & Restore" XML export, a JSON array or plain text. */

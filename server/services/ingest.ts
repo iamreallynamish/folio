@@ -17,10 +17,20 @@ export function fingerprint(t: { last4?: string | null; accountId?: number | nul
   return [t.last4 ?? `acct${t.accountId ?? ""}`, t.amountMinor, t.currency, t.date, t.merchantKey, t.type].join("|");
 }
 
-/** Same fingerprint is a duplicate unless both carry different times (two coffees on one day). */
-export async function findDuplicate(userId: number, fp: string, time: string | null | undefined, excludeId?: number) {
-  const rows = await all<{ id: number; time: string | null }>("SELECT id, time FROM transactions WHERE user_id = ? AND fingerprint = ?", userId, fp);
-  return rows.find((r) => r.id !== excludeId && (!r.time || !time || r.time === time));
+/**
+ * Same fingerprint is a duplicate unless the two can be told apart: different times (two coffees on one
+ * day), or different balances left afterwards. ICICI's alerts carry no time, but each states the card
+ * balance after the purchase — two ¥302 7-Eleven purchases on one day leave two different balances.
+ */
+export async function findDuplicate(userId: number, fp: string, time: string | null | undefined, excludeId?: number, balanceMinor?: number) {
+  const rows = await all<{ id: number; time: string | null; raw_sms: string | null }>("SELECT id, time, raw_sms FROM transactions WHERE user_id = ? AND fingerprint = ?", userId, fp);
+  return rows.find((r) => {
+    if (r.id === excludeId) return false;
+    if (r.time && time && r.time !== time) return false;
+    const otherBalance = r.raw_sms ? parseSms(r.raw_sms).balanceMinor : undefined;
+    if (balanceMinor != null && otherBalance != null && otherBalance !== balanceMinor) return false;
+    return true;
+  });
 }
 
 export async function categoryByKey(userId: number, key: string): Promise<{ id: number; name: string }> {
@@ -85,12 +95,15 @@ async function evaluate(userId: number, msg: IncomingSms, batchSeen: Set<string>
 
   const key = p.merchant?.key ?? merchantKey(p.rawMerchant ?? "");
   const fp = fingerprint({ last4: p.last4, accountId: account?.id, amountMinor: p.amountMinor!, currency: p.currency!, date: p.date!, merchantKey: key, type: p.type! });
-  const dup = batchSeen.has(fp + "|" + (p.time ?? "")) ? { id: -1 } : await findDuplicate(userId, fp, p.time);
+  const dup = batchSeen.has(batchKey(fp, p)) ? { id: -1 } : await findDuplicate(userId, fp, p.time, undefined, p.balanceMinor);
   const cat = p.type === "income" ? undefined : await resolveCategory(userId, key, p.merchant?.category ?? "uncategorised");
   const category = cat ? (p.merchant?.subcategory && !cat.learned ? `${cat.name} / ${p.merchant.subcategory}` : cat.name) : "Money in";
   if (dup) return { status: "duplicate", reason: "Matches a transaction already recorded", parsed: p, hash, fp, category, account: accountLabel, duplicateOfId: dup.id > 0 ? dup.id : undefined };
   return { status: "new", parsed: p, hash, fp, category, account: accountLabel };
 }
+
+/** Identity of a purchase within one paste: same fingerprint, time and balance afterwards. */
+const batchKey = (fp: string, p: ParsedSms) => `${fp}|${p.time ?? ""}|${p.balanceMinor ?? ""}`;
 
 export async function previewMessages(userId: number, msgs: IncomingSms[]): Promise<PreviewItem[]> {
   const seen = new Set<string>();
@@ -99,7 +112,7 @@ export async function previewMessages(userId: number, msgs: IncomingSms[]): Prom
   for (const m of msgs) {
     const { hash, fp, ...item } = await evaluate(userId, m, seen);
     seen.add(hash);
-    if (fp && item.status === "new") seen.add(fp + "|" + (item.parsed.time ?? ""));
+    if (fp && item.status === "new") seen.add(batchKey(fp, item.parsed));
     out.push(item);
   }
   return out;
@@ -117,7 +130,7 @@ export async function importMessages(userId: number, msgs: IncomingSms[], source
         item.balanceUpdated = await applyBalance(await ensureAccount(userId, p), p);
         await run("INSERT INTO seen_sms(user_id, sms_hash, class, created_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING", userId, hash, "balance", now());
       } else if (item.status === "new") {
-        seen.add(fp + "|" + (p.time ?? ""));
+        seen.add(batchKey(fp!, p));
         const account = await ensureAccount(userId, p);
         const key = p.merchant?.key ?? merchantKey(p.rawMerchant ?? "");
         const cat = p.type === "income" ? undefined : await resolveCategory(userId, key, p.merchant?.category ?? "uncategorised");
@@ -135,7 +148,30 @@ export async function importMessages(userId: number, msgs: IncomingSms[], source
       }
       items.push(item);
     }
+    const recategorised = await rematchUncategorised(userId);
     const count = (s: ItemStatus) => items.filter((i) => i.status === s).length;
-    return { items, imported: count("new"), duplicates: count("duplicate"), ignored: count("ignored"), balances: count("balance") };
+    return { items, imported: count("new"), duplicates: count("duplicate"), ignored: count("ignored"), balances: count("balance"), recategorised };
   });
+}
+
+/**
+ * Re-read earlier bank-message transactions that were left uncategorised, with the current parser and
+ * merchant dictionary (e.g. "SEVEN" from before hyphenated names were understood is now 7-Eleven).
+ * Only touches rows still uncategorised and never corrected by the user; returns how many it fixed.
+ */
+export async function rematchUncategorised(userId: number): Promise<number> {
+  const rows = await all<any>(
+    `SELECT t.id, t.raw_sms, t.account_id, t.type FROM transactions t JOIN categories c ON c.id = t.category_id
+     WHERE t.user_id = ? AND c.key = 'uncategorised' AND t.raw_sms IS NOT NULL AND t.needs_review = 1`, userId);
+  let fixed = 0;
+  for (const row of rows) {
+    const p = parseSms(row.raw_sms);
+    if (p.class !== "transaction" || !p.merchant?.known || p.type !== row.type) continue;
+    const cat = await resolveCategory(userId, p.merchant.key, p.merchant.category);
+    const fp = fingerprint({ last4: p.last4, accountId: row.account_id, amountMinor: p.amountMinor!, currency: p.currency!, date: p.date!, merchantKey: p.merchant.key, type: p.type! });
+    await run("UPDATE transactions SET merchant=?, merchant_key=?, raw_descriptor=?, category_id=?, subcategory=?, fingerprint=?, needs_review=0, updated_at=? WHERE id=? AND user_id=?",
+      p.merchant.name, p.merchant.key, p.rawMerchant ?? null, cat.id, cat.learned ? null : p.merchant.subcategory ?? null, fp, now(), row.id, userId);
+    fixed++;
+  }
+  return fixed;
 }

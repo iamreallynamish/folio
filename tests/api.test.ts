@@ -90,14 +90,14 @@ test("older balance does not overwrite a newer one; balance notices update", asy
 });
 
 test("category corrections are learned", async () => {
-  await A("POST", "/sms/import", { text: "JPY 800 Axis Bank Card no. XX7117 07-10-26 12:00:00 IST KALDI COFFEE FARM" });
-  const txns = (await A("GET", "/transactions?q=kaldi")).body.transactions;
+  await A("POST", "/sms/import", { text: "JPY 800 Axis Bank Card no. XX7117 07-10-26 12:00:00 IST TANAKA SHOTEN" });
+  const txns = (await A("GET", "/transactions?q=tanaka")).body.transactions;
   assert.equal(txns[0].categoryName, "Uncategorised");
   assert.equal(txns[0].needsReview, true);
   const food = (await A("GET", "/categories")).body.categories.find((c: any) => c.key === "groceries");
   await A("PATCH", `/transactions/${txns[0].id}`, { categoryId: food.id });
-  await A("POST", "/sms/import", { text: "JPY 650 Axis Bank Card no. XX7117 09-10-26 13:00:00 IST KALDI COFFEE FARM" });
-  const after = (await A("GET", "/transactions?q=kaldi")).body.transactions;
+  await A("POST", "/sms/import", { text: "JPY 650 Axis Bank Card no. XX7117 09-10-26 13:00:00 IST TANAKA SHOTEN" });
+  const after = (await A("GET", "/transactions?q=tanaka")).body.transactions;
   assert.deepEqual(after.map((t: any) => [t.categoryName, t.needsReview]), [["Groceries / Convenience Store", false], ["Groceries / Convenience Store", false]]);
 });
 
@@ -192,4 +192,39 @@ test("first-run tour progress is saved and finishing marks the account onboarded
   const again = (await C("PATCH", "/me", { onboarded: false })).body.user;
   assert.equal(again.onboarded, false, "setup can be asked for again");
   assert.equal(again.tourStep, 0, "and starts from the welcome");
+});
+
+const D = client(); // shared by the tests below (sign-ups are rate-limited)
+test("same-day identical purchases with different balances are both kept; re-pasting adds nothing", async () => {
+  assert.equal((await D("POST", "/auth/register", { email: "same-day@example.com", name: "S", password: "correct horse battery" })).status, 201);
+  const a = "JPY 302.00 has been made using your ICICI Bank Forex Prepaid Card XX0817 at SEVEN-ELEVEN on 27-Oct-2026 . Current available balance on your Forex Prepaid Card is JPY 85,889.00 0.";
+  const b = "JPY 302.00 has been made using your ICICI Bank Forex Prepaid Card XX0817 at SEVEN-ELEVEN on 27-Oct-2026 . Current available balance on your Forex Prepaid Card is JPY 85,587.00 0.";
+  const first = (await D("POST", "/sms/import", { text: `${a}\n\n${b}` })).body;
+  assert.equal(first.imported, 2, "two messages, two balances: two purchases");
+  const again = (await D("POST", "/sms/import", { text: `${a}\n\n${b}` })).body;
+  assert.equal(again.imported, 0);
+  assert.equal(again.duplicates, 2);
+});
+
+test("an Axis 'using … Credit Card' alert pasted with its line break imports as one purchase", async () => {
+  const r = (await D("POST", "/sms/import", { text: "JPY 339 using Axis Bank Credit Card no. XX7117 on 31-10-26 21:02:52 IST at \nSEVEN-ELEVE." })).body;
+  assert.equal(r.imported, 1);
+  const t = (await D("GET", "/transactions")).body.transactions[0];
+  assert.equal(t.merchant, "7-Eleven");
+  assert.equal(t.amountMinor, 339);
+});
+
+test("earlier imports left uncategorised are re-read on the next import", async () => {
+  const { run, get } = await import("../server/db.ts");
+  // Recreate how the old parser stored an ICICI 7-Eleven purchase: merchant "Seven", uncategorised, needs review.
+  const t = (await D("GET", "/transactions")).body.transactions.find((x: any) => x.merchant === "7-Eleven" && x.amountMinor === 302);
+  const unc = await get<{ id: number }>("SELECT id FROM categories WHERE user_id = (SELECT user_id FROM transactions WHERE id = ?) AND key = 'uncategorised'", t.id);
+  await run("UPDATE transactions SET merchant = 'Seven', merchant_key = 'SEVEN', category_id = ?, needs_review = 1 WHERE id = ?", unc!.id, t.id);
+  const r = (await D("POST", "/sms/import", { text: "JPY 402.00 has been made using your ICICI Bank Forex Prepaid Card XX0817 at FAMILYMART on 28-Oct-2026 . Current available balance on your Forex Prepaid Card is JPY 79,734.00 0." })).body;
+  assert.equal(r.imported, 1);
+  assert.equal(r.recategorised, 1);
+  const fixed = (await D("GET", "/transactions")).body.transactions.find((x: any) => x.id === t.id);
+  assert.equal(fixed.merchant, "7-Eleven");
+  assert.equal(fixed.needsReview, false);
+  assert.match(fixed.categoryName, /^Groceries/);
 });
