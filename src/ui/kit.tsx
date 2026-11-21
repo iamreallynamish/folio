@@ -181,11 +181,30 @@ export const currentTheme = (): "light" | "dark" => {
   const t = document.documentElement.dataset.theme;
   return t === "light" || t === "dark" ? t : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 };
-export function setTheme(t: "system" | "light" | "dark") {
+/** Where the last press happened, so a change can grow from the control that made it. */
+let lastPress: { x: number; y: number } | null = null;
+if (typeof window !== "undefined") addEventListener("pointerdown", (e) => { lastPress = { x: e.clientX, y: e.clientY }; }, { capture: true, passive: true });
+
+/**
+ * Switch light/dark: the new appearance spreads as a circle from the control that was pressed (or from
+ * `origin`), over the old one. A View Transition snapshot is clipped, so it is composited, not repainted.
+ * Reduce Motion: a short cross-fade.
+ */
+export function setTheme(t: "system" | "light" | "dark", origin?: { x: number; y: number }) {
   const apply = () => applyTheme(t);
-  // Ease the light/dark change rather than flashing it (motion guidance on brightness jumps).
   const vt = (document as any).startViewTransition;
-  if (vt && !reducedMotion()) vt.call(document, apply); else apply();
+  if (!vt) return apply();
+  const root = document.documentElement;
+  if (reducedMotion()) { vt.call(document, apply); return; }
+  const { x, y } = origin ?? lastPress ?? { x: innerWidth / 2, y: 0 };
+  const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+  root.dataset.themeSwitch = "";
+  const tr = vt.call(document, apply);
+  tr.ready.then(() => root.animate(
+    { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+    { duration: 700, easing: "cubic-bezier(0.45, 0, 0.15, 1)", pseudoElement: "::view-transition-new(root)" },
+  )).catch(() => {});
+  tr.finished.finally(() => delete root.dataset.themeSwitch);
 }
 function applyTheme(t: "system" | "light" | "dark") {
   if (t === "system") { localStorage.removeItem("folio-theme"); delete document.documentElement.dataset.theme; }
@@ -196,7 +215,7 @@ function applyTheme(t: "system" | "light" | "dark") {
 export function ThemeToggle() {
   const [t, setT] = useState(currentTheme);
   useEffect(() => { const f = () => setT(currentTheme()); window.addEventListener("folio:theme", f); return () => window.removeEventListener("folio:theme", f); }, []);
-  return <button className="icon-btn" aria-label={t === "dark" ? "Switch to light mode" : "Switch to dark mode"} onClick={() => setTheme(t === "dark" ? "light" : "dark")}><Icon name={t === "dark" ? "sun" : "moon"} /></button>;
+  return <button className="icon-btn" aria-label={t === "dark" ? "Switch to light mode" : "Switch to dark mode"} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setTheme(t === "dark" ? "light" : "dark", { x: r.left + r.width / 2, y: r.top + r.height / 2 }); }}><Icon name={t === "dark" ? "sun" : "moon"} /></button>;
 }
 /** Ambient background animation (Settings → Appearance); on unless turned off on this device. */
 export const backgroundOn = () => { try { return localStorage.getItem("folio-bg") !== "off"; } catch { return true; } };
@@ -300,4 +319,30 @@ export function MonthNav({ month, onChange, max }: { month: string; onChange: (m
       <button className="icon-btn" aria-label="Next month" disabled={month >= max} style={{ opacity: month >= max ? 0.35 : 1 }} onClick={() => onChange(shift(1))}><Icon name="chevron" /></button>
     </div>
   );
+}
+
+/**
+ * Leave a full-screen overlay gracefully: it plays its exit (class "leaving"), the page behind settles in
+ * (<html data-arrive>), and `then` runs once the exit has finished (with a timer as a backstop).
+ */
+export function useLeave(settle = true) {
+  const [leaving, setLeaving] = useState(false);
+  const next = useRef<(() => void) | null>(null);
+  const timer = useRef(0);
+  const done = () => {
+    if (!next.current) return;
+    const fn = next.current; next.current = null; clearTimeout(timer.current);
+    fn();
+    setTimeout(() => delete document.documentElement.dataset.arrive, 900);
+  };
+  const leave = (then: () => void) => {
+    if (next.current) return;
+    next.current = then; setLeaving(true);
+    // The page settles in behind an opaque overlay; behind a frosted one it stays still (moving it would
+    // re-blur the glass every frame).
+    if (settle) document.documentElement.dataset.arrive = "";
+    timer.current = window.setTimeout(done, 800);
+  };
+  const onAnimationEnd = (e: React.AnimationEvent) => { if (e.target === e.currentTarget) done(); };
+  return { leaving, leave, onAnimationEnd };
 }

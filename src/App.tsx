@@ -90,7 +90,12 @@ export function App() {
   // Until the first screen is ready, the launch loader stays up: logo, then the finished page — no empty page between.
   const [booted, setBooted] = useState(false);
   useScreenEntrance(mainRef, `${tab}:${user?.id ?? ""}`, () => setBooted(true));
-  const veil = !booted && <div key="veil" className="auth boot-veil" aria-busy="true"><LogoLoader size={72} /></div>;
+  // Once the first screen is ready the launch screen fades away (the logo drifting up as it goes) while
+  // the page cascades in beneath it; it is removed once the fade has finished.
+  const [veilGone, setVeilGone] = useState(false);
+  useEffect(() => { if (booted && !veilGone) { const t = setTimeout(() => setVeilGone(true), reducedMotion() ? 0 : 700); return () => clearTimeout(t); } }, [booted]);
+  useEffect(() => { if (user === null) setBooted(true); }, [user]); // the sign-in screen has no data to wait for
+  const veil = !veilGone && <div key="veil" className={`auth boot-veil ${booted ? "leaving" : ""}`} aria-busy={!booted}><LogoLoader size={72} /></div>;
   const tabRef = useRef(tab);
   tabRef.current = tab;
   const go = useCallback((t: Tab) => {
@@ -113,7 +118,7 @@ export function App() {
   }), [user, version, refresh, accounts, categories, go, tab]);
 
   if (user === undefined) return <>{veil}{null}</>;
-  if (!user) return <><Auth onDone={(u) => { setUser(u); go("home"); }} /><ToastHost /></>;
+  if (!user) return <><Auth onDone={(u) => { setUser(u); go("home"); }} />{veil}<ToastHost /></>;
 
   const Screen = { home: Home, activity: Activity, plan: Plan, invest: Invest, ask: Assistant, settings: Settings }[tab];
   return (<>{veil}

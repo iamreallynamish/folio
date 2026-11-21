@@ -1042,3 +1042,32 @@ html[data-sheet] .edge-blur > i { display: none; }
 /* Placeholders are solid, so the background animation never shows through them. */
 .skeleton { background: color-mix(in srgb, var(--label) 7%, var(--bg)); }
 .skeleton::after { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--label) 7%, transparent), transparent); }
+
+
+/* ---------- Transitions between big moments ---------- */
+/* Launch: the loading screen fades away and the logo drifts up as Home cascades in beneath. */
+.boot-veil { transition: opacity 0.6s var(--ease-out), visibility 0s linear 0.6s; }
+.boot-veil .logo-loader { transition: transform 0.6s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.45s var(--ease-out); }
+.boot-veil.leaving { opacity: 0; visibility: hidden; pointer-events: none; }
+.boot-veil.leaving .logo-loader { transform: translateY(-14px) scale(1.12); opacity: 0; }
+
+/* Light/dark: the new snapshot is revealed by a growing circle (kit.setTheme); no cross-fade on top, and
+   the tab bar and sidebar change with the page instead of fading separately. */
+html[data-theme-switch]::view-transition-old(root), html[data-theme-switch]::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+html[data-theme-switch]::view-transition-old(root) { z-index: 0; }
+html[data-theme-switch]::view-transition-new(root) { z-index: 1; }
+html[data-theme-switch] .tabbar, html[data-theme-switch] .sidebar, html[data-theme-switch] .tab-pill, html[data-theme-switch] .side-pill { view-transition-name: none; }
+
+/* Finishing setup or the tour: the overlay fades and gently grows away while the page settles in behind it. */
+.setup.leaving, .tour-veil.leaving, .tour-layer.leaving { animation: overlay-out 0.55s cubic-bezier(0.32, 0.72, 0, 1) both; pointer-events: none; }
+@keyframes overlay-out { to { opacity: 0; transform: scale(1.04); } }
+html[data-arrive] .main { animation: arrive 0.7s cubic-bezier(0.32, 0.72, 0, 1) 0.08s both; }
+@keyframes arrive { from { opacity: 0.35; transform: scale(0.97) translateY(10px); } }
+@media (prefers-reduced-motion: reduce) {
+  .boot-veil .logo-loader, .boot-veil.leaving .logo-loader { transform: none; }
+  .setup.leaving, .tour-veil.leaving, .tour-layer.leaving { animation: overlay-fade 0.25s ease both; }
+  html[data-arrive] .main { animation: none; }
+}
+@keyframes overlay-fade { to { opacity: 0; } }
+/* A frosted overlay fades out as a solid tint of the same depth: fading live glass re-blurs it every frame. */
+.tour-veil.leaving { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(4, 4, 8, 0.82); }

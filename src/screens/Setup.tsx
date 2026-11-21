@@ -21,7 +21,7 @@ const whole = (minor: number, currency: string) => formatMoney(minor, currency).
 import { applyAccent } from "../ui/accent.ts";
 import { Icon } from "../ui/Icon.tsx";
 import { LogoMark } from "../ui/Logo.tsx";
-import { toast } from "../ui/kit.tsx";
+import { toast, useLeave } from "../ui/kit.tsx";
 
 const STEPS = ["hello", "goals", "currency", "income", "budget", "colour", "cards", "import", "done"] as const;
 type Step = (typeof STEPS)[number];
@@ -83,6 +83,8 @@ export function Setup({ mode, onFinish }: { mode: "first" | "replay"; onFinish: 
   const [busy, setBusy] = useState(false);
   const cards = accounts.filter((a) => a.kind === "card" || a.kind === "bank");
   const s = STEPS[step];
+  const exit = useLeave();
+  const finish = (o: { tour: boolean; importNow: boolean }) => exit.leave(() => onFinish(o));
 
   // Each step starts with its question; an answer swaps the bubble to a reply.
   useEffect(() => setReply(null), [step]);
@@ -129,10 +131,10 @@ export function Setup({ mode, onFinish }: { mode: "first" | "replay"; onFinish: 
     : { initial: { opacity: 0, x: 48 * dir }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -48 * dir } };
 
   return (
-    <div className="setup" role="dialog" aria-modal="true" aria-label="Set up Folio">
+    <div className={`setup ${exit.leaving ? "leaving" : ""}`} role="dialog" aria-modal="true" aria-label="Set up Folio" onAnimationEnd={exit.onAnimationEnd}>
       {s !== "done" && (
         <header className="setup-top">
-          <button className="icon-btn" onClick={step === 0 && mode === "replay" ? () => onFinish({ tour: false, importNow: false }) : back} disabled={step === 0 && mode === "first"} aria-label={step === 0 ? "Close" : "Back"}>
+          <button className="icon-btn" onClick={step === 0 && mode === "replay" ? () => finish({ tour: false, importNow: false }) : back} disabled={step === 0 && mode === "first"} aria-label={step === 0 ? "Close" : "Back"}>
             <Icon name={step === 0 ? "x" : "back"} />
           </button>
           <div className="setup-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} aria-label="Setup progress">
@@ -202,8 +204,8 @@ export function Setup({ mode, onFinish }: { mode: "first" | "replay"; onFinish: 
       <footer className="setup-foot">
         {s === "done" ? (
           <>
-            <button className="setup-cta" onClick={() => onFinish({ tour: true, importNow: !!importNow })}>Show me around</button>
-            <button className="btn plain" onClick={() => onFinish({ tour: false, importNow: !!importNow })}>Start using Folio</button>
+            <button className="setup-cta" onClick={() => finish({ tour: true, importNow: !!importNow })}>Show me around</button>
+            <button className="btn plain" onClick={() => finish({ tour: false, importNow: !!importNow })}>Start using Folio</button>
           </>
         ) : (
           <button className="setup-cta" disabled={!canContinue || busy} onClick={next}>

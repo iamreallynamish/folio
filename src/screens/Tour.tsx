@@ -15,6 +15,7 @@ import { LogoLoader } from "../ui/Logo.tsx";
 import { Reveal } from "../ui/Reveal.tsx";
 import { reducedMotion } from "../ui/spring.ts";
 import { formatMoney } from "../format.ts";
+import { useLeave } from "../ui/kit.tsx";
 
 interface Step { id: string; tab: Tab; planView?: "budget" | "income"; title: string; body: string }
 const ALL_STEPS: Step[] = [
@@ -164,8 +165,11 @@ export function Tour({ mode, start, onClose }: { mode: "first" | "replay"; start
     }
   };
   const back = () => { if (step > 0) { setStep(step - 1); save({ tourStep: step }); } };
-  const skip = () => { save({ onboarded: true, tourStep: 0 }); go("home"); onClose(); };
-  const finish = (importNow?: boolean) => { onClose(); if (importNow) setTimeout(() => openImport(), 300); };
+  // Leaving fades the tour away while the page settles in, rather than removing it at once.
+  const exit = useLeave(false);
+  const skip = () => { save({ onboarded: true, tourStep: 0 }); go("home"); exit.leave(onClose); };
+  const finish = (importNow?: boolean) => exit.leave(() => { onClose(); if (importNow) setTimeout(() => openImport(), 200); });
+  const leaveCls = exit.leaving ? " leaving" : "";
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -182,7 +186,7 @@ export function Tour({ mode, start, onClose }: { mode: "first" | "replay"; start
   // ---- render
   if (phase === "welcome") {
     return (
-      <div className="tour-veil" role="dialog" aria-modal="true" aria-label="Welcome to Folio">
+      <div className={`tour-veil${leaveCls}`} role="dialog" aria-modal="true" aria-label="Welcome to Folio" onAnimationEnd={exit.onAnimationEnd}>
         <div className="tour-welcome">
           <LogoLoader size={96} />
           <h1 className="tour-hero">
@@ -212,7 +216,7 @@ export function Tour({ mode, start, onClose }: { mode: "first" | "replay"; start
       : `Bring in your bank messages from ${firstCard} and Folio sorts every purchase for you.`;
     const personal = { line, chips: [budget && `${budget} a month`, `${cards.length} ${cards.length === 1 ? "card" : "cards"}`, user.baseCurrency].filter(Boolean) as string[] };
     return (
-      <div className="tour-veil" role="dialog" aria-modal="true" aria-label="Setup complete">
+      <div className={`tour-veil${leaveCls}`} role="dialog" aria-modal="true" aria-label="Setup complete" onAnimationEnd={exit.onAnimationEnd}>
         <div className="tour-welcome">
           <svg className="tour-check" viewBox="0 0 64 64" aria-hidden="true">
             <defs><linearGradient id="tour-g" x1="0" y1="1" x2="1" y2="0"><stop offset="0" style={{ stopColor: "var(--g1)" }} /><stop offset="0.5" style={{ stopColor: "var(--g2)" }} /><stop offset="1" style={{ stopColor: "var(--g3)" }} /></linearGradient></defs>
@@ -233,7 +237,7 @@ export function Tour({ mode, start, onClose }: { mode: "first" | "replay"; start
 
   const s = STEPS[step];
   return (
-    <div className="tour-layer" role="dialog" aria-modal="true" aria-label={`Tour: ${s.title}`}>
+    <div className={`tour-layer${leaveCls}`} role="dialog" aria-modal="true" aria-label={`Tour: ${s.title}`} onAnimationEnd={exit.onAnimationEnd}>
       {/* Blocks the app underneath; the spotlight's shadow does the dimming. */}
       <div className="tour-catch" />
       <Dim x={sx} y={sy} w={sw} h={sh} radius={rect?.radius ?? 20} />
