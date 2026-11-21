@@ -397,7 +397,8 @@ core.post("/sms/import", h(async (req, res) => {
 /** New transactions from an import: notify (a summary for automatic imports) and check the budget. */
 export async function afterImport(user: User, r: Awaited<ReturnType<typeof importMessages>>, automatic: boolean) {
   const fresh = r.items.filter((i) => i.status === "new").map((i) => ({
-    merchant: i.parsed.merchant?.name ?? "Unknown merchant", amountMinor: i.parsed.amountMinor!, currency: i.parsed.currency!, type: i.parsed.type!, account: i.account ?? null,
+    merchant: i.parsed.merchant?.name ?? "Unknown merchant", merchantKey: i.parsed.merchant?.key, amountMinor: i.parsed.amountMinor!, currency: i.parsed.currency!, type: i.parsed.type!,
+    date: i.parsed.date, bank: i.parsed.bank ?? null, last4: i.parsed.last4 ?? null, category: i.category ?? null, wallet: i.parsed.merchant?.wallet ?? null,
   }));
   if (fresh.length) await afterTransactions((await userRow(user.id))!, fresh, automatic).catch(() => {});
 }
@@ -409,8 +410,10 @@ core.post("/push/subscribe", h(async (req, res) => {
   const endpoint = String(s?.endpoint ?? ""), p256dh = String(s?.keys?.p256dh ?? ""), auth = String(s?.keys?.auth ?? "");
   if (!/^https:\/\/[^\s]{10,2000}$/.test(endpoint) || !p256dh || !auth) bad("That notification subscription isn't valid.");
   // One device belongs to one account: re-subscribing moves it.
-  await run(`INSERT INTO push_subs(user_id, endpoint, p256dh, auth, created_at) VALUES (?,?,?,?,?)
-             ON CONFLICT (endpoint) DO UPDATE SET user_id=excluded.user_id, p256dh=excluded.p256dh, auth=excluded.auth`, req.user.id, endpoint, p256dh, auth, now());
+  // The device's time zone, for quiet hours (an IANA name like "Asia/Tokyo"; anything else is ignored).
+  const tz = typeof req.body?.tz === "string" && /^[A-Za-z_]+(\/[A-Za-z0-9_+\-]+){0,2}$/.test(req.body.tz) ? req.body.tz : null;
+  await run(`INSERT INTO push_subs(user_id, endpoint, p256dh, auth, tz, created_at) VALUES (?,?,?,?,?,?)
+             ON CONFLICT (endpoint) DO UPDATE SET user_id=excluded.user_id, p256dh=excluded.p256dh, auth=excluded.auth, tz=excluded.tz`, req.user.id, endpoint, p256dh, auth, tz, now());
   res.json({ ok: true, devices: (await get<{ n: number }>("SELECT COUNT(*) n FROM push_subs WHERE user_id = ?", req.user.id))!.n });
 }));
 core.post("/push/unsubscribe", h(async (req, res) => {

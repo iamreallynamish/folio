@@ -239,12 +239,15 @@ function CategoriesSheet({ rules, onClose, onOpen }: { rules: any[]; onClose: ()
   );
 }
 
-const ALERTS: { key: "budget" | "scholarship" | "card" | "transactions" | "daily"; icon: string; title: string; sub: string }[] = [
-  { key: "budget", icon: "percent", title: "Budget", sub: "When you reach your alert level, and if you go over" },
-  { key: "scholarship", icon: "cap", title: "Scholarship and income", sub: "A payment due in the next two days, or one that's late" },
-  { key: "card", icon: "card", title: "Card payments", sub: "Three days before a credit card payment is due" },
-  { key: "transactions", icon: "tray", title: "New transactions", sub: "When bank messages arrive by automatic import" },
-  { key: "daily", icon: "calendar", title: "Daily summary", sub: "Each morning: yesterday's spending and what's left" },
+const ALERTS: { key: "budget" | "scholarship" | "card" | "transactions" | "daily" | "weekly" | "investing" | "quiet"; icon: string; title: string; sub: string }[] = [
+  { key: "transactions", icon: "tray", title: "Spending", sub: "\"Spent ¥494 at 7-Eleven\", as bank messages arrive by automatic import" },
+  { key: "budget", icon: "percent", title: "Budget", sub: "Spending fast, at your alert level, over, and back under" },
+  { key: "scholarship", icon: "cap", title: "Scholarship and income", sub: "Landing soon, just came in, or still waiting" },
+  { key: "card", icon: "card", title: "Cards", sub: "A bill due in three days, and a forex card running low" },
+  { key: "daily", icon: "calendar", title: "Morning summary", sub: "Yesterday's spending and what's left for the month" },
+  { key: "weekly", icon: "pie", title: "Weekly recap", sub: "Sunday evening: your week against the one before" },
+  { key: "investing", icon: "trend", title: "Investments", sub: "When one of your stocks moves 4% or more" },
+  { key: "quiet", icon: "moon", title: "Quiet hours", sub: "Nothing between 11 pm and 7 am; it waits for the morning" },
 ];
 
 /** Push notifications for this device, and which alerts the account wants (shared by all its devices). */

@@ -19,12 +19,13 @@ declare global { namespace Express { interface Request { user: User } } }
 export class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
 
 /** Which notifications a person wants; everything but the daily summary is on until they change it. */
-export const NOTIFY_KINDS = ["budget", "scholarship", "card", "transactions", "daily"] as const;
+export const NOTIFY_KINDS = ["budget", "scholarship", "card", "transactions", "daily", "weekly", "investing", "quiet"] as const;
 export type NotifyPrefs = Record<(typeof NOTIFY_KINDS)[number], boolean>;
 export function notifyPrefs(raw: string | null | undefined): NotifyPrefs {
   let v: any = {};
   try { v = raw ? JSON.parse(raw) : {}; } catch { /* default */ }
-  return { budget: v.budget ?? true, scholarship: v.scholarship ?? true, card: v.card ?? true, transactions: v.transactions ?? true, daily: v.daily ?? false };
+  return { budget: v.budget ?? true, scholarship: v.scholarship ?? true, card: v.card ?? true, transactions: v.transactions ?? true, daily: v.daily ?? false,
+    weekly: v.weekly ?? true, investing: v.investing ?? true, quiet: v.quiet ?? true };
 }
 
 /** First-run setup answers, as stored. Unknown keys are dropped. */

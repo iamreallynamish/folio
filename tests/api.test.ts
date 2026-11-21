@@ -334,7 +334,7 @@ test("notifications: subscribe, preferences, alerts sent once, dead devices forg
     const sub = { endpoint: "https://push.example.com/device-a", keys: { p256dh: "BAAA", auth: "xyz" } };
     assert.equal((await D("POST", "/push/subscribe", { subscription: sub })).body.devices, 1);
     const me = (await D("GET", "/me")).body.user;
-    assert.deepEqual(me.notify, { budget: true, scholarship: true, card: true, transactions: true, daily: false });
+    assert.deepEqual(me.notify, { budget: true, scholarship: true, card: true, transactions: true, daily: false, weekly: true, investing: true, quiet: true });
     // Test notification reaches the device.
     assert.equal((await D("POST", "/push/test", {})).status, 200);
     assert.equal(sent.at(-1)!.body.title, "Notifications are on");
@@ -343,24 +343,25 @@ test("notifications: subscribe, preferences, alerts sent once, dead devices forg
     await D("POST", "/transactions", { type: "expense", amount: "500", currency: "JPY", date: new Date().toISOString().slice(0, 10), merchant: "Lawson" });
     const u = await get<any>("SELECT * FROM users WHERE email = 'same-day@example.com'");
     await budgetCheck(u); await budgetCheck(u);
-    const over = sent.filter((s) => s.body.title === "Over budget");
+    const over = sent.filter((s) => s.body.title === "You've gone over budget");
     assert.equal(over.length, 1, "sent once, not again");
     assert.equal(over[0].body.url, "/#plan");
     // Preferences: daily summary is off by default, on when chosen; sent once per day.
     let n = sent.length;
     await dailyChecks(u, "2026-11-21");
-    assert.ok(!sent.slice(n).some((s) => s.body.title === "Your day in Folio"));
+    const isDaily = (t: string) => /^Morning, |didn't spend anything yesterday|Yesterday was a big one/.test(t);
+    assert.ok(!sent.slice(n).some((s) => isDaily(s.body.title)));
     await D("PATCH", "/me", { notify: { daily: true } });
     const u2 = await get<any>("SELECT * FROM users WHERE email = 'same-day@example.com'");
     n = sent.length;
     await dailyChecks(u2, "2026-11-21"); await dailyChecks(u2, "2026-11-21");
-    assert.equal(sent.slice(n).filter((s) => s.body.title === "Your day in Folio").length, 1);
+    assert.equal(sent.slice(n).filter((s) => isDaily(s.body.title)).length, 1);
     // Card due: due day set on a card → alert inside three days.
     const card = (await D("GET", "/accounts")).body.accounts.find((a: any) => a.kind === "card");
     await D("PATCH", `/accounts/${card.id}`, { statementDay: 10, dueDay: 23 });
     n = sent.length;
     await dailyChecks(u2, "2026-11-21");
-    assert.ok(sent.slice(n).some((s) => /payment due/.test(s.body.title)), "card due in two days");
+    assert.ok(sent.slice(n).some((s) => /card bill is due (Monday|in|tomorrow|today|Sunday|Tuesday)/.test(s.body.title) && /Pay by 23 Nov to skip the interest/.test(s.body.body)), "card due in two days");
     // A device that has gone away is removed.
     gone = new Set([sub.endpoint]);
     await D("POST", "/push/test", {});
@@ -377,4 +378,58 @@ test("daily notification run: open without CRON_SECRET, required with it", async
     assert.equal((await fetch(base + "/cron/notify")).status, 401);
     assert.equal((await fetch(base + "/cron/notify", { headers: { Authorization: "Bearer s3cret" } })).status, 200);
   } finally { delete process.env.CRON_SECRET; }
+});
+
+
+test("notification wording: spending, top-ups, money in, low balance, quiet hours, weekly recap", async () => {
+  const { setPushSender, setPushClock, afterTransactions, flushQueue, weeklyRecap, lowBalanceCheck } = await import("../server/services/notify.ts");
+  const { get, run } = await import("../server/db.ts");
+  const sent: any[] = [];
+  setPushSender(async (_sub, payload) => { sent.push(JSON.parse(payload)); });
+  try {
+    const sub = { endpoint: "https://push.example.com/device-b", keys: { p256dh: "BAAA", auth: "xyz" } };
+    await D("POST", "/push/subscribe", { subscription: sub, tz: "Asia/Tokyo" });
+    const u = await get<any>("SELECT * FROM users WHERE email = 'same-day@example.com'");
+    setPushClock(() => new Date("2026-11-21T03:00:00Z")); // noon in Tokyo
+    // One purchase: "Spent ¥494 at 7-Eleven", the card on the second line.
+    await afterTransactions(u, [{ merchant: "7-Eleven", merchantKey: "7 ELEVEN", amountMinor: 494, currency: "JPY", type: "expense", bank: "Axis Bank", last4: "7117", category: "Groceries / Convenience Store" }], true);
+    assert.deepEqual([sent.at(-1).title, sent.at(-1).body], ["Spent ¥494 at 7-Eleven", "Axis ••7117"]);
+    // A place never seen before.
+    await afterTransactions(u, [{ merchant: "Kaldi Coffee Farm", merchantKey: "KALDI NEVER SEEN", amountMinor: 880, currency: "JPY", type: "expense", category: "Groceries / Convenience Store" }], true);
+    assert.equal(sent.at(-1).body, "First time there. I put it under Groceries.");
+    // Several places, and a top-up.
+    await afterTransactions(u, [
+      { merchant: "7-Eleven", amountMinor: 300, currency: "JPY", type: "expense" }, { merchant: "McDonald's", amountMinor: 740, currency: "JPY", type: "expense" },
+      { merchant: "Ito-Yokado", amountMinor: 1175, currency: "JPY", type: "expense" }, { merchant: "Mobile Suica", amountMinor: 2000, currency: "JPY", type: "transfer", wallet: "Mobile Suica" },
+    ], true);
+    assert.ok(sent.some((x) => x.title === "Spent ¥2,215 across 3 places" && x.body === "7-Eleven, McDonald's and Ito-Yokado"));
+    assert.ok(sent.some((x) => x.title === "Topped up ¥2,000 on Mobile Suica" && x.body === "Not counted as spending"));
+    // Imports the person pasted themselves don't announce what they just did.
+    const before = sent.length;
+    await afterTransactions(u, [{ merchant: "Lawson", amountMinor: 200, currency: "JPY", type: "expense" }], false);
+    assert.ok(!sent.slice(before).some((x) => /^Spent /.test(x.title)));
+    // Money in matching an expected scholarship payment.
+    const src = (await D("POST", "/income/sources", { kind: "scholarship", name: "JASSO Honors Scholarship", currency: "JPY", recurrence: "monthly", amount: "48000", firstDate: "2026-11-25", occurrences: 2 })).body.id;
+    await afterTransactions(u, [{ merchant: "JASSO", amountMinor: 48000, currency: "JPY", type: "income", date: "2026-11-24" }], true);
+    assert.ok(sent.some((x) => x.title === "JASSO just came in 💸" && x.body === "¥48,000 arrived. Tap to mark it received."));
+    assert.ok(src);
+    // Forex card low: ¥1,000 left, spending about ¥1,000 a day on it.
+    const forex = (await D("POST", "/accounts", { kind: "card", bank: "ICICI Bank", cardType: "Forex Prepaid Card", name: "ICICI forex", last4: "9999", currency: "JPY", balance: "1000" })).body.account;
+    for (let i = 1; i <= 21; i++) await D("POST", "/transactions", { type: "expense", amount: "1000", currency: "JPY", date: new Date(Date.now() - i * 864e5).toISOString().slice(0, 10), merchant: `Shop ${i}`, accountId: forex.id, force: true });
+    await lowBalanceCheck(await get<any>("SELECT * FROM users WHERE email = 'same-day@example.com'"));
+    assert.ok(sent.some((x) => x.title === "Your forex card is getting low" && /^¥1,000 left on ICICI\. That's about 1 day at your usual pace\.$/.test(x.body)));
+    // Quiet hours: 2 am in Tokyo → held; sent once it's morning.
+    setPushClock(() => new Date("2026-11-21T17:00:00Z"));
+    const n = sent.length;
+    await afterTransactions(u, [{ merchant: "FamilyMart", amountMinor: 402, currency: "JPY", type: "expense" }], true);
+    assert.equal(sent.length, n, "held during quiet hours");
+    assert.equal((await get<{ n: number }>("SELECT COUNT(*) n FROM push_queue"))!.n, 1);
+    setPushClock(() => new Date("2026-11-21T23:30:00Z")); // 08:30 in Tokyo
+    assert.equal(await flushQueue(), 1);
+    assert.equal(sent.at(-1).title, "Spent ¥402 at FamilyMart");
+    // Weekly recap.
+    assert.equal(await weeklyRecap(await get<any>("SELECT * FROM users WHERE email = 'same-day@example.com'"), new Date().toISOString().slice(0, 10)), true);
+    assert.match(sent.at(-1).title, /^You spent ¥[\d,]+ this week$/);
+    await run("DELETE FROM push_subs WHERE endpoint = ?", sub.endpoint);
+  } finally { setPushSender(null); setPushClock(null); }
 });

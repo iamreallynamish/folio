@@ -37,7 +37,7 @@ export async function enablePush(): Promise<PushState> {
   const { publicKey } = await api("/push/key");
   let sub = await reg.pushManager.getSubscription();
   if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(publicKey) });
-  await api("/push/subscribe", { body: { subscription: sub.toJSON() } });
+  await api("/push/subscribe", { body: { subscription: sub.toJSON(), tz: Intl.DateTimeFormat().resolvedOptions().timeZone } });
   return "on";
 }
 

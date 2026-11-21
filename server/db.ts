@@ -39,6 +39,11 @@ CREATE TABLE IF NOT EXISTS notify_log (
   PRIMARY KEY (user_id, key)
 );
 CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+-- Each device's time zone (for quiet hours), and alerts waiting for a device's morning.
+ALTER TABLE push_subs ADD COLUMN IF NOT EXISTS tz TEXT;
+CREATE TABLE IF NOT EXISTS push_queue (
+  id SERIAL PRIMARY KEY, sub_id INTEGER NOT NULL REFERENCES push_subs(id) ON DELETE CASCADE, payload TEXT NOT NULL, created_at TEXT COLLATE "C" NOT NULL
+);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS notify TEXT;
 -- The person's own market-watch symbols (JSON list of TradingView "EXCHANGE:SYMBOL").
 ALTER TABLE users ADD COLUMN IF NOT EXISTS market_symbols TEXT;
@@ -126,8 +131,8 @@ CREATE INDEX IF NOT EXISTS txn_category ON transactions(category_id);
  * Detects whether the newest schema change is already in place (one query on a warm database).
  * When adding to SCHEMA, write the change idempotently and point this check at it.
  */
-const SCHEMA_CHECK = "SELECT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass('public.users') AND attname = 'notify' AND NOT attisdropped) AS t";
-const TABLES = ["users", "sessions", "accounts", "categories", "merchant_rules", "transactions", "seen_sms", "fx_rates", "income_sources", "income_payments", "holdings", "market_cache", "rate_hits", "push_subs", "notify_log", "app_settings"];
+const SCHEMA_CHECK = "SELECT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass('public.push_subs') AND attname = 'tz' AND NOT attisdropped) AS t";
+const TABLES = ["users", "sessions", "accounts", "categories", "merchant_rules", "transactions", "seen_sms", "fx_rates", "income_sources", "income_payments", "holdings", "market_cache", "rate_hits", "push_subs", "notify_log", "app_settings", "push_queue"];
 /**
  * Supabase exposes the public schema through its Data API. Row-level security with no policies
  * blocks that API entirely; the app connects as the table owner, which RLS does not restrict.

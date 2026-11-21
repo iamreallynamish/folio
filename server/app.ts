@@ -3,7 +3,7 @@ import { ConfigError, explainDbError, ready } from "./db.js";
 import { secretConfigured } from "./crypto.js";
 import { changePassword, csrf, HttpError, login, logout, register, requireUser, userByIngestToken } from "./auth.js";
 import { afterImport, core, h, ingestBody } from "./routes/core.js";
-import { dailyRun } from "./services/notify.js";
+import { scheduledRun } from "./services/notify.js";
 import { income } from "./routes/income.js";
 import { portfolio } from "./routes/portfolio.js";
 import { answer, SUGGESTIONS } from "./services/assistant.js";
@@ -56,7 +56,7 @@ app.post("/api/ingest/sms", h(async (req, res) => {
 app.get("/api/cron/notify", h(async (req, res) => {
   const secret = process.env.CRON_SECRET;
   if (secret && req.get("authorization") !== `Bearer ${secret}`) throw new HttpError(401, "Not allowed.");
-  res.json(await dailyRun());
+  res.json(await scheduledRun(req.query.kind === "weekly" ? "weekly" : "daily"));
 }));
 
 app.use("/api", requireUser);
