@@ -27,6 +27,19 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS tour_step INTEGER NOT NULL DEFAULT 0;
 -- Personalisation: the chosen accent colour, and the first-run setup answers (JSON).
 ALTER TABLE users ADD COLUMN IF NOT EXISTS accent TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS profile TEXT;
+-- Push notifications: each device a person turned them on for, which alerts they want (JSON), a log
+-- so no alert is sent twice, and app-wide settings (the server's push signing keys, encrypted).
+CREATE TABLE IF NOT EXISTS push_subs (
+  id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at TEXT COLLATE "C" NOT NULL
+);
+CREATE INDEX IF NOT EXISTS push_subs_user ON push_subs(user_id);
+CREATE TABLE IF NOT EXISTS notify_log (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, key TEXT NOT NULL, sent_at TEXT COLLATE "C" NOT NULL,
+  PRIMARY KEY (user_id, key)
+);
+CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS notify TEXT;
 -- The person's own market-watch symbols (JSON list of TradingView "EXCHANGE:SYMBOL").
 ALTER TABLE users ADD COLUMN IF NOT EXISTS market_symbols TEXT;
 CREATE TABLE IF NOT EXISTS sessions (
@@ -113,8 +126,8 @@ CREATE INDEX IF NOT EXISTS txn_category ON transactions(category_id);
  * Detects whether the newest schema change is already in place (one query on a warm database).
  * When adding to SCHEMA, write the change idempotently and point this check at it.
  */
-const SCHEMA_CHECK = "SELECT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass('public.users') AND attname = 'market_symbols' AND NOT attisdropped) AS t";
-const TABLES = ["users", "sessions", "accounts", "categories", "merchant_rules", "transactions", "seen_sms", "fx_rates", "income_sources", "income_payments", "holdings", "market_cache", "rate_hits"];
+const SCHEMA_CHECK = "SELECT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass('public.users') AND attname = 'notify' AND NOT attisdropped) AS t";
+const TABLES = ["users", "sessions", "accounts", "categories", "merchant_rules", "transactions", "seen_sms", "fx_rates", "income_sources", "income_payments", "holdings", "market_cache", "rate_hits", "push_subs", "notify_log", "app_settings"];
 /**
  * Supabase exposes the public schema through its Data API. Row-level security with no policies
  * blocks that API entirely; the app connects as the table owner, which RLS does not restrict.

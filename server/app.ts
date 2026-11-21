@@ -2,7 +2,8 @@ import express, { type Request, type Response, type NextFunction } from "express
 import { ConfigError, explainDbError, ready } from "./db.js";
 import { secretConfigured } from "./crypto.js";
 import { changePassword, csrf, HttpError, login, logout, register, requireUser, userByIngestToken } from "./auth.js";
-import { core, h, ingestBody } from "./routes/core.js";
+import { afterImport, core, h, ingestBody } from "./routes/core.js";
+import { dailyRun } from "./services/notify.js";
 import { income } from "./routes/income.js";
 import { portfolio } from "./routes/portfolio.js";
 import { answer, SUGGESTIONS } from "./services/assistant.js";
@@ -44,7 +45,18 @@ app.post("/api/ingest/sms", h(async (req, res) => {
   const user = await userByIngestToken(req.get("authorization"));
   if (!user) throw new HttpError(401, "Invalid ingest token.");
   const r = await importMessages(user.id, ingestBody(req.body), "ingest");
+  await afterImport(user, r, true);
   res.json({ imported: r.imported, duplicates: r.duplicates, ignored: r.ignored, balances: r.balances });
+}));
+
+/**
+ * Daily notification run, called by Vercel's scheduler (vercel.json "crons"). When CRON_SECRET is set,
+ * Vercel sends it and it is required; without it, a stray call does no harm (every alert is sent once).
+ */
+app.get("/api/cron/notify", h(async (req, res) => {
+  const secret = process.env.CRON_SECRET;
+  if (secret && req.get("authorization") !== `Bearer ${secret}`) throw new HttpError(401, "Not allowed.");
+  res.json(await dailyRun());
 }));
 
 app.use("/api", requireUser);

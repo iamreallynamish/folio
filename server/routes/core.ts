@@ -10,6 +10,8 @@ import { identifyMerchant, merchantKey } from "../../shared/merchants.js";
 import { messagesFromFile, splitMessages } from "../../shared/sms.js";
 import { categoryByKey, ensureWallet, fingerprint, findDuplicate, importMessages, previewMessages, resolveCategory, type IncomingSms } from "../services/ingest.js";
 import { homeInsights } from "../services/insights.js";
+import { afterTransactions, budgetCheck, notify, vapidKeys } from "../services/notify.js";
+import { NOTIFY_KINDS } from "../auth.js";
 import { incomeSummary, monthComparison, monthSummary, rates, recurring, thisMonth, today, userRow } from "../services/summary.js";
 
 export const h = (fn: (req: Request, res: Response) => unknown) => (req: Request, res: Response, next: NextFunction) =>
@@ -44,6 +46,11 @@ core.patch("/me", h(async (req, res) => {
   const th = b.alertThreshold !== undefined ? Math.min(100, Math.max(50, Math.round(Number(b.alertThreshold)) || 80)) : u.alert_threshold;
   const name = b.name !== undefined ? String(b.name).trim().slice(0, 60) || bad("Enter your name.") : u.name;
   await run("UPDATE users SET name=?, base_currency=?, monthly_budget_minor=?, alert_threshold=? WHERE id=?", name, base, budget, th, u.id);
+  if (b.notify && typeof b.notify === "object") {
+    const cur = publicUser(u).notify as Record<string, boolean>;
+    for (const k of NOTIFY_KINDS) if (typeof b.notify[k] === "boolean") cur[k] = b.notify[k];
+    await run("UPDATE users SET notify=? WHERE id=?", JSON.stringify(cur), u.id);
+  }
   if (b.marketSymbols !== undefined) {
     const list = Array.isArray(b.marketSymbols) ? [...new Set(b.marketSymbols.map((x: unknown) => String(x).trim().toUpperCase()))] as string[] : bad("Send a list of symbols.");
     if (list.length > MAX_WATCH) bad(`Watch up to ${MAX_WATCH} symbols.`);
@@ -321,6 +328,7 @@ core.post("/transactions", h(async (req, res) => {
     `INSERT INTO transactions(user_id,account_id,transfer_account_id,type,amount_minor,currency,date,time,merchant,merchant_key,category_id,subcategory,note,source,fingerprint,created_at,updated_at)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'manual',?,?,?)`,
     req.user.id, f.accountId, f.transferId, f.type, f.amountMinor, f.currency, f.date, f.time, f.merchant, f.key, f.categoryId, f.subcategory, f.note, f.fp, t, t);
+  if (f.type === "expense") await budgetCheck((await userRow(req.user.id))!).catch(() => {});
   res.status(201).json({ transaction: await oneTxn(id, req.user) });
 }));
 
@@ -380,7 +388,40 @@ function incoming(body: any): IncomingSms[] {
   return msgs;
 }
 core.post("/sms/preview", h(async (req, res) => res.json({ items: await previewMessages(req.user.id, incoming(req.body)) })));
-core.post("/sms/import", h(async (req, res) => res.json(await importMessages(req.user.id, incoming(req.body)))));
+core.post("/sms/import", h(async (req, res) => {
+  const r = await importMessages(req.user.id, incoming(req.body));
+  await afterImport(req.user, r, false);
+  res.json(r);
+}));
+
+/** New transactions from an import: notify (a summary for automatic imports) and check the budget. */
+export async function afterImport(user: User, r: Awaited<ReturnType<typeof importMessages>>, automatic: boolean) {
+  const fresh = r.items.filter((i) => i.status === "new").map((i) => ({
+    merchant: i.parsed.merchant?.name ?? "Unknown merchant", amountMinor: i.parsed.amountMinor!, currency: i.parsed.currency!, type: i.parsed.type!, account: i.account ?? null,
+  }));
+  if (fresh.length) await afterTransactions((await userRow(user.id))!, fresh, automatic).catch(() => {});
+}
+
+// ---------- push notifications ----------
+core.get("/push/key", h(async (_req, res) => res.json({ publicKey: (await vapidKeys()).publicKey })));
+core.post("/push/subscribe", h(async (req, res) => {
+  const s = req.body?.subscription ?? req.body;
+  const endpoint = String(s?.endpoint ?? ""), p256dh = String(s?.keys?.p256dh ?? ""), auth = String(s?.keys?.auth ?? "");
+  if (!/^https:\/\/[^\s]{10,2000}$/.test(endpoint) || !p256dh || !auth) bad("That notification subscription isn't valid.");
+  // One device belongs to one account: re-subscribing moves it.
+  await run(`INSERT INTO push_subs(user_id, endpoint, p256dh, auth, created_at) VALUES (?,?,?,?,?)
+             ON CONFLICT (endpoint) DO UPDATE SET user_id=excluded.user_id, p256dh=excluded.p256dh, auth=excluded.auth`, req.user.id, endpoint, p256dh, auth, now());
+  res.json({ ok: true, devices: (await get<{ n: number }>("SELECT COUNT(*) n FROM push_subs WHERE user_id = ?", req.user.id))!.n });
+}));
+core.post("/push/unsubscribe", h(async (req, res) => {
+  await run("DELETE FROM push_subs WHERE user_id = ? AND endpoint = ?", req.user.id, String(req.body?.endpoint ?? ""));
+  res.json({ ok: true });
+}));
+core.post("/push/test", h(async (req, res) => {
+  const reached = await notify(req.user, "test", "test", { title: "Notifications are on", body: "Folio will let you know about your budget, payments and new transactions.", url: "/#settings" });
+  if (!reached) bad("No device received it. Turn notifications on again on this device.");
+  res.json({ ok: true, reached });
+}));
 export const ingestBody = incoming;
 
 // ---------- home and budget ----------

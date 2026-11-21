@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, type Category } from "../api.ts";
 import { useApp } from "../ctx.ts";
 import { CURRENCIES } from "../../shared/money.ts";
@@ -10,6 +10,7 @@ import { CategorySheet } from "./Plan.tsx";
 import { Reveal } from "../ui/Reveal.tsx";
 import { ACCENTS } from "../../shared/accents.ts";
 import { applyAccent } from "../ui/accent.ts";
+import { disablePush, enablePush, isIOS, pushState, type PushState } from "../ui/push.ts";
 
 export function Settings() {
   const { user, setUser, accounts, categories, version, refresh, openAccount, openImport, startTour } = useApp();
@@ -47,6 +48,8 @@ export function Settings() {
           <Icon name="chevron" className="chev" />
         </button>
       </div>
+
+      <Notifications />
 
       <section>
         <div className="section-label">Appearance</div>
@@ -233,5 +236,70 @@ function CategoriesSheet({ rules, onClose, onOpen }: { rules: any[]; onClose: ()
         {rules.length === 0 && <div className="cell subhead muted">When you change a transaction's category, Folio remembers the merchant and lists it here.</div>}
       </div>
     </Sheet>
+  );
+}
+
+const ALERTS: { key: "budget" | "scholarship" | "card" | "transactions" | "daily"; icon: string; title: string; sub: string }[] = [
+  { key: "budget", icon: "percent", title: "Budget", sub: "When you reach your alert level, and if you go over" },
+  { key: "scholarship", icon: "cap", title: "Scholarship and income", sub: "A payment due in the next two days, or one that's late" },
+  { key: "card", icon: "card", title: "Card payments", sub: "Three days before a credit card payment is due" },
+  { key: "transactions", icon: "tray", title: "New transactions", sub: "When bank messages arrive by automatic import" },
+  { key: "daily", icon: "calendar", title: "Daily summary", sub: "Each morning: yesterday's spending and what's left" },
+];
+
+/** Push notifications for this device, and which alerts the account wants (shared by all its devices). */
+function Notifications() {
+  const { user, setUser } = useApp();
+  const [state, setState] = useState<PushState | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { pushState().then(setState).catch(() => setState("unsupported")); }, []);
+  const prefs: Record<string, boolean> = user.notify ?? {};
+  async function turnOn() {
+    setBusy(true);
+    try { const st = await enablePush(); setState(st); if (st === "on") toast("Notifications are on for this device"); else if (st === "denied") toast("Notifications were not allowed"); }
+    catch (e: any) { toast(e.message ?? "Couldn't turn on notifications"); }
+    finally { setBusy(false); }
+  }
+  async function turnOff() { setBusy(true); try { setState(await disablePush()); toast("Notifications are off for this device"); } finally { setBusy(false); } }
+  async function test() { try { await api("/push/test", { body: {} }); toast("Sent. It should arrive in a moment."); } catch (e: any) { toast(e.message); } }
+  async function setPref(key: string, on: boolean) {
+    try { const r = await api("/me", { method: "PATCH", body: { notify: { [key]: on } } }); setUser(r.user); } catch (e: any) { toast(e.message); }
+  }
+  return (
+    <section>
+      <div className="section-label">Notifications</div>
+      <div className="stack" style={{ gap: 12 }}>
+        <div className="card stack notif-card" style={{ gap: 10 }}>
+          {state === "needs-home-screen" && (<>
+            <div className="headline">Add Folio to your Home Screen first</div>
+            <p className="subhead muted" style={{ margin: 0 }}>iPhone delivers notifications to apps on the Home Screen. In Safari, tap <b>Share</b>, then <b>Add to Home Screen</b>, then open Folio from its icon and come back here.</p>
+          </>)}
+          {state === "unsupported" && <p className="subhead muted" style={{ margin: 0 }}>{isIOS() ? "Notifications need iOS 16.4 or later." : "This browser can't receive notifications. Try Chrome, Edge, Firefox or Safari."}</p>}
+          {state === "denied" && (<>
+            <div className="headline">Notifications are blocked</div>
+            <p className="subhead muted" style={{ margin: 0 }}>{isIOS() ? "Turn them on in the iPhone's Settings → Notifications → Folio." : "Allow notifications for this site in your browser's settings, then come back here."}</p>
+          </>)}
+          {state === "off" && (<>
+            <div className="headline">Get notified about your money</div>
+            <p className="subhead muted" style={{ margin: 0 }}>Budget alerts, payments due and new transactions, on your lock screen.</p>
+            <button className="btn primary" disabled={busy} onClick={turnOn}><Icon name="bell" />Turn on notifications</button>
+          </>)}
+          {state === "on" && (<>
+            <div className="row" style={{ gap: 10 }}><span className="badge verified">On</span><span className="subhead">Notifications are on for this device</span></div>
+            <div className="duo"><button className="btn gray" onClick={test}>Send a test</button><button className="btn gray" disabled={busy} onClick={turnOff}>Turn off here</button></div>
+          </>)}
+          {state === null && <div className="skeleton" style={{ height: 44 }} />}
+        </div>
+        <div className="list">
+          {ALERTS.map((a) => (
+            <label className="cell notif-row" key={a.key}>
+              <span className="tx-icon soft" style={{ ["--tint" as any]: "var(--accent)" }}><Icon name={a.icon} /></span>
+              <span className="grow"><span className="headline" style={{ display: "block" }}>{a.title}</span><span className="footnote muted">{a.sub}</span></span>
+              <input type="checkbox" role="switch" className="switch" checked={!!prefs[a.key]} onChange={(e) => setPref(a.key, e.target.checked)} aria-label={a.title} />
+            </label>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }

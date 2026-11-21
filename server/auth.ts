@@ -12,11 +12,20 @@ export interface User {
   id: number; email: string; name: string; base_currency: string; monthly_budget_minor: number | null;
   alert_threshold: number; last_reviewed_at: string; av_key_enc: string | null; anthropic_key_enc: string | null;
   ingest_token_hash: string | null; created_at: string; pass_hash: string; onboarded_at: string | null; tour_step: number;
-  accent: string | null; profile: string | null; market_symbols: string | null;
+  accent: string | null; profile: string | null; market_symbols: string | null; notify: string | null;
 }
 declare global { namespace Express { interface Request { user: User } } }
 
 export class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
+
+/** Which notifications a person wants; everything but the daily summary is on until they change it. */
+export const NOTIFY_KINDS = ["budget", "scholarship", "card", "transactions", "daily"] as const;
+export type NotifyPrefs = Record<(typeof NOTIFY_KINDS)[number], boolean>;
+export function notifyPrefs(raw: string | null | undefined): NotifyPrefs {
+  let v: any = {};
+  try { v = raw ? JSON.parse(raw) : {}; } catch { /* default */ }
+  return { budget: v.budget ?? true, scholarship: v.scholarship ?? true, card: v.card ?? true, transactions: v.transactions ?? true, daily: v.daily ?? false };
+}
 
 /** First-run setup answers, as stored. Unknown keys are dropped. */
 export interface Profile { goals?: string[]; incomes?: string[]; setupStep?: number; setupDone?: boolean }
@@ -52,7 +61,7 @@ export function publicUser(u: User) {
     id: u.id, email: u.email, name: u.name, baseCurrency: u.base_currency, monthlyBudgetMinor: u.monthly_budget_minor,
     alertThreshold: u.alert_threshold, lastReviewedAt: u.last_reviewed_at,
     hasMarketKey: !!u.av_key_enc, hasAssistantKey: !!u.anthropic_key_enc, hasIngestToken: !!u.ingest_token_hash, onboarded: !!u.onboarded_at, tourStep: u.tour_step ?? 0,
-    accent: u.accent ?? "folio", profile: parseProfile(u.profile),
+    accent: u.accent ?? "folio", profile: parseProfile(u.profile), notify: notifyPrefs(u.notify),
     marketSymbols: ((): string[] => { try { const v = JSON.parse(u.market_symbols ?? "[]"); return Array.isArray(v) ? v : []; } catch { return []; } })(),
   };
 }

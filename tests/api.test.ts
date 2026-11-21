@@ -316,3 +316,65 @@ test("home insights: what changed, plus insights from the person's own records",
   const firstOk = ins.more.findIndex((i: any) => i.tone !== "warn");
   assert.ok(firstOk === -1 || ins.more.slice(firstOk).every((i: any) => i.tone !== "warn"));
 });
+
+test("notifications: subscribe, preferences, alerts sent once, dead devices forgotten", async () => {
+  const { setPushSender, dailyChecks, budgetCheck } = await import("../server/services/notify.ts");
+  const { get, run } = await import("../server/db.ts");
+  const sent: { endpoint: string; body: any }[] = [];
+  let gone = new Set<string>();
+  setPushSender(async (sub, payload) => {
+    if (gone.has(sub.endpoint)) throw Object.assign(new Error("gone"), { statusCode: 410 });
+    sent.push({ endpoint: sub.endpoint, body: JSON.parse(payload) });
+  });
+  try {
+    const key = (await D("GET", "/push/key")).body.publicKey;
+    assert.match(key, /^[A-Za-z0-9_-]{80,}$/, "server signing key, generated once");
+    assert.equal((await D("GET", "/push/key")).body.publicKey, key);
+    assert.equal((await D("POST", "/push/subscribe", { subscription: { endpoint: "nope" } })).status, 400);
+    const sub = { endpoint: "https://push.example.com/device-a", keys: { p256dh: "BAAA", auth: "xyz" } };
+    assert.equal((await D("POST", "/push/subscribe", { subscription: sub })).body.devices, 1);
+    const me = (await D("GET", "/me")).body.user;
+    assert.deepEqual(me.notify, { budget: true, scholarship: true, card: true, transactions: true, daily: false });
+    // Test notification reaches the device.
+    assert.equal((await D("POST", "/push/test", {})).status, 200);
+    assert.equal(sent.at(-1)!.body.title, "Notifications are on");
+    // Budget: set a tiny budget so this month's spending is over it → one alert, never repeated.
+    await D("PATCH", "/me", { monthlyBudget: "1" });
+    await D("POST", "/transactions", { type: "expense", amount: "500", currency: "JPY", date: new Date().toISOString().slice(0, 10), merchant: "Lawson" });
+    const u = await get<any>("SELECT * FROM users WHERE email = 'same-day@example.com'");
+    await budgetCheck(u); await budgetCheck(u);
+    const over = sent.filter((s) => s.body.title === "Over budget");
+    assert.equal(over.length, 1, "sent once, not again");
+    assert.equal(over[0].body.url, "/#plan");
+    // Preferences: daily summary is off by default, on when chosen; sent once per day.
+    let n = sent.length;
+    await dailyChecks(u, "2026-11-21");
+    assert.ok(!sent.slice(n).some((s) => s.body.title === "Your day in Folio"));
+    await D("PATCH", "/me", { notify: { daily: true } });
+    const u2 = await get<any>("SELECT * FROM users WHERE email = 'same-day@example.com'");
+    n = sent.length;
+    await dailyChecks(u2, "2026-11-21"); await dailyChecks(u2, "2026-11-21");
+    assert.equal(sent.slice(n).filter((s) => s.body.title === "Your day in Folio").length, 1);
+    // Card due: due day set on a card → alert inside three days.
+    const card = (await D("GET", "/accounts")).body.accounts.find((a: any) => a.kind === "card");
+    await D("PATCH", `/accounts/${card.id}`, { statementDay: 10, dueDay: 23 });
+    n = sent.length;
+    await dailyChecks(u2, "2026-11-21");
+    assert.ok(sent.slice(n).some((s) => /payment due/.test(s.body.title)), "card due in two days");
+    // A device that has gone away is removed.
+    gone = new Set([sub.endpoint]);
+    await D("POST", "/push/test", {});
+    assert.equal((await get<{ n: number }>("SELECT COUNT(*) n FROM push_subs WHERE endpoint = ?", sub.endpoint))!.n, 0);
+    await run("UPDATE users SET monthly_budget_minor = NULL WHERE email = 'same-day@example.com'");
+  } finally { setPushSender(null); }
+});
+
+test("daily notification run: open without CRON_SECRET, required with it", async () => {
+  const r = await fetch(base + "/cron/notify");
+  assert.equal(r.status, 200);
+  process.env.CRON_SECRET = "s3cret";
+  try {
+    assert.equal((await fetch(base + "/cron/notify")).status, 401);
+    assert.equal((await fetch(base + "/cron/notify", { headers: { Authorization: "Bearer s3cret" } })).status, 200);
+  } finally { delete process.env.CRON_SECRET; }
+});
