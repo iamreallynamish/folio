@@ -8,6 +8,8 @@ import { LogoMark } from "../ui/Logo.tsx";
 import { Field, Segmented, setBackground, setTheme, Sheet, toast, useBackground, useLoad, useSheetClose, confirmAction } from "../ui/kit.tsx";
 import { CategorySheet } from "./Plan.tsx";
 import { Reveal } from "../ui/Reveal.tsx";
+import { ACCENTS } from "../../shared/accents.ts";
+import { applyAccent } from "../ui/accent.ts";
 
 export function Settings() {
   const { user, setUser, accounts, categories, version, refresh, openAccount, openImport, startTour } = useApp();
@@ -49,6 +51,16 @@ export function Settings() {
       <section>
         <div className="section-label">Appearance</div>
         <div className="card stack"><Segmented label="Theme" value={theme} onChange={applyTheme} options={[{ value: "system", label: "Automatic" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} />
+          <div className="stack" style={{ gap: 8 }}>
+            <span className="footnote muted">Colour · also your app icon</span>
+            <div className="accent-row" role="radiogroup" aria-label="Accent colour">
+              {ACCENTS.map((a) => (
+                <button key={a.key} role="radio" aria-checked={user.accent === a.key} aria-label={a.name} title={a.name} className="accent-dot"
+                  style={{ background: `linear-gradient(135deg, ${a.stops[0]}, ${a.stops[1]} 55%, ${a.stops[2]})` }}
+                  onClick={async () => { applyAccent(a.key); try { const r = await api("/me", { method: "PATCH", body: { accent: a.key } }); setUser(r.user); } catch (e: any) { toast(e.message); } }} />
+              ))}
+            </div>
+          </div>
           <Segmented label="Background animation" value={ambient ? "on" : "off"} onChange={(v) => setBackground(v === "on")} options={[{ value: "on", label: "On" }, { value: "off", label: "Off" }]} /></div>
       </section>
 

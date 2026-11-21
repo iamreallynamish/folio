@@ -33,7 +33,7 @@ export interface AsciiParams {
 export const MAN_DITHER: AsciiParams = { cellSize: 9, contrast: 158, brightness: 0, density: 20, invert: false, animSpeed: 100, animIntensity: 60 };
 
 /** Text that sits straight on the background (not inside a card); the pattern keeps clear of it. */
-const FREE_TEXT = ".main h1, .main h2, .main h3, .main p, .main .section-label, .main .eyebrow, .main .caption, .main .footnote, .main .hint, .main .large-title, .main .screen-head, .main .home-head, .main .between > *";
+const FREE_TEXT = ".auth-card > *, .main h1, .main h2, .main h3, .main p, .main .section-label, .main .eyebrow, .main .caption, .main .footnote, .main .hint, .main .large-title, .main .screen-head, .main .home-head, .main .between > *";
 const ON_SURFACE = ".card, .list, .pay-card, .month-panel, .market-frame, .wallet-stack, .btn, .quick-pills, .sheet, .tile";
 const CLEAR = 14; // px of breathing room around text
 
@@ -89,7 +89,7 @@ function fillRect(L: Float32Array, cols: number, rows: number, x0: number, x1: n
   }
 }
 
-export function AsciiBackground({ params = MAN_DITHER }: { params?: AsciiParams }) {
+export function AsciiBackground({ params = MAN_DITHER, full = false }: { params?: AsciiParams; full?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -206,7 +206,7 @@ export function AsciiBackground({ params = MAN_DITHER }: { params?: AsciiParams 
     // Text moves when the page scrolls, changes or loads; re-mark (cheaply) on the next frame.
     const dirty = () => { clearDirty = true; if (reduce.matches || document.hidden) draw(start); };
     const mo = new MutationObserver(dirty);
-    mo.observe(document.querySelector(".app") ?? document.body, { childList: true, subtree: true });
+    mo.observe(document.querySelector(".app, .auth") ?? document.body, { childList: true, subtree: true });
     addEventListener("scroll", dirty, { passive: true });
     layout(); run();
     addEventListener("resize", onResize);
@@ -226,5 +226,5 @@ export function AsciiBackground({ params = MAN_DITHER }: { params?: AsciiParams 
     };
   }, [params]);
 
-  return <canvas ref={ref} className="ascii-bg" aria-hidden="true" />;
+  return <canvas ref={ref} className={`ascii-bg ${full ? "full" : ""}`} aria-hidden="true" />;
 }

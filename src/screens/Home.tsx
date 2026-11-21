@@ -8,6 +8,7 @@ import { Empty, Skeleton, ThemeToggle, toast, useLoad, useMedia } from "../ui/ki
 import { TxnRow } from "../ui/TxnRow.tsx";
 import { Reveal } from "../ui/Reveal.tsx";
 import TradingViewWidget from "@/components/TradingViewWidget";
+import { MarketSheet } from "./MarketSheet.tsx";
 import { spring, SPRING, type SpringHandle } from "../ui/spring.ts";
 import { WalletCard } from "../ui/WalletCard.tsx";
 import { CountUp } from "../ui/motion.tsx";
@@ -16,6 +17,8 @@ export function Home() {
   const { user, setUser, version, refresh, go, openTxn, openImport, openAccount } = useApp();
   const { data, error } = useLoad(() => api("/home"), [version]);
   const [front, setFront] = useState<number | null>(null);
+  const [marketOpen, setMarketOpen] = useState(false);
+  const watch = user.marketSymbols ?? [];
   // Card stack reorder animates with FLIP + springs: measure, reorder, then spring each card from
   // where it was on screen (including mid-animation) to its new slot.
   const slots = useRef(new Map<number, HTMLDivElement>());
@@ -168,7 +171,7 @@ export function Home() {
 
       {standing.length > 0 && <div className="list">{standing.map(changeRow)}</div>}
 
-      <div>
+      <div className="stack" style={{ gap: 24 }}>
         {!caughtUp && (
           // One compact line: new items are marked with a dot in Latest Transactions above.
           <section className="visit-line" aria-label="Since your last visit">
@@ -186,9 +189,16 @@ export function Home() {
         )}
 
         <section className="market-card" aria-label="Market watch">
-          <div className="between section-label"><span>Market watch</span><span className="caption faint">BSE · TradingView</span></div>
-          <div className="market-frame"><TradingViewWidget /></div>
+          <div className="between section-label"><span>Market watch</span>
+            <button className="btn plain small" style={{ minHeight: 0, padding: 0 }} onClick={() => setMarketOpen(true)}>{watch.length ? "Edit" : "Add"}</button></div>
+          {watch.length > 0
+            ? <div className="market-frame"><TradingViewWidget symbols={watch} /></div>
+            : <div className="card"><Empty icon="trend" title="Watch your markets">
+                <p className="subhead">Paste a TradingView link to a stock, index or crypto, and its live chart shows here in your colours.</p>
+                <button className="btn tinted small" onClick={() => setMarketOpen(true)}>Add a TradingView link</button>
+              </Empty></div>}
         </section>
+        {marketOpen && <MarketSheet onClose={() => setMarketOpen(false)} />}
 
       </div>
       </div>

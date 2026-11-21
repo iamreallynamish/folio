@@ -14,10 +14,11 @@ import { TextEffect } from "@/components/ui/text-effect";
 import { LogoLoader } from "../ui/Logo.tsx";
 import { Reveal } from "../ui/Reveal.tsx";
 import { reducedMotion } from "../ui/spring.ts";
+import { toast } from "../ui/kit.tsx";
 
 interface Step { id: string; tab: Tab; planView?: "budget" | "income"; title: string; body: string }
-const STEPS: Step[] = [
-  { id: "cards", tab: "home", title: "Your cards", body: "Your ICICI and Axis cards live here. Their balances update by themselves whenever a bank message states one. Tap the card behind to bring it forward, or tap a card to edit it." },
+const ALL_STEPS: Step[] = [
+  { id: "cards", tab: "home", title: "Your cards", body: "Your cards live here. Their balances update by themselves whenever a bank message states one. Tap a card behind to bring it forward, or tap a card to edit it." },
   { id: "transactions", tab: "home", title: "Every transaction, understood", body: "Paste or share your bank SMS and Folio reads the merchant, amount, card and category. Tap any transaction for its details, to change its category, or to delete it with Undo." },
   { id: "budget", tab: "home", title: "Your month at a glance", body: "What you've spent this month, what's left of your budget, and the last seven days. Tap it to set a budget and see where your money goes." },
   { id: "income", tab: "plan", planView: "income", title: "Income and scholarships", body: "Record scholarships, allowances and family transfers with the dates you expect them. Only money you mark as received is counted, never what's still expected." },
@@ -38,6 +39,11 @@ type Rect = { top: number; left: number; width: number; height: number; radius: 
 export function Tour({ mode, start, onClose }: { mode: "first" | "replay"; start: number; onClose: () => void }) {
   const { user, setUser, go, tab, openImport } = useApp();
   const first = user.name.split(" ")[0];
+  // Only the parts this person said they care about in setup (everything, for accounts set up before it).
+  const goals = user.profile?.goals ?? [], incomes = user.profile?.incomes ?? [], answered = !!user.profile?.setupDone;
+  const STEPS = ALL_STEPS.filter((x) =>
+    x.id === "income" ? !answered || goals.includes("scholarship") || incomes.some((i) => i !== "none")
+    : x.id === "invest" ? !answered || goals.includes("investing") : true);
   const [phase, setPhase] = useState<"welcome" | "tour" | "done">(start === 0 ? "welcome" : "tour");
   const [step, setStep] = useState(Math.min(Math.max(start - 1, 0), STEPS.length - 1));
   const [ready, setReady] = useState(false); // welcome: Start Setup shown after 5 s
@@ -152,7 +158,11 @@ export function Tour({ mode, start, onClose }: { mode: "first" | "replay"; start
   const startTour = () => { setPhase("tour"); setStep(0); save({ tourStep: 1 }); };
   const next = () => {
     if (step < STEPS.length - 1) { setStep(step + 1); save({ tourStep: step + 2 }); }
-    else { setPhase("done"); save({ onboarded: true, tourStep: 0 }); go("home"); }
+    else {
+      save({ onboarded: true, tourStep: 0 }); go("home");
+      // After setup's own celebration, the tour simply ends; otherwise it closes with "You're all set".
+      if (answered) { toast("You're ready. Enjoy Folio!"); onClose(); } else setPhase("done");
+    }
   };
   const back = () => { if (step > 0) { setStep(step - 1); save({ tourStep: step }); } };
   const skip = () => { save({ onboarded: true, tourStep: 0 }); go("home"); onClose(); };
@@ -195,7 +205,7 @@ export function Tour({ mode, start, onClose }: { mode: "first" | "replay"; start
       <div className="tour-veil" role="dialog" aria-modal="true" aria-label="Setup complete">
         <div className="tour-welcome">
           <svg className="tour-check" viewBox="0 0 64 64" aria-hidden="true">
-            <defs><linearGradient id="tour-g" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stopColor="#19c37d" /><stop offset="0.5" stopColor="#20b7c9" /><stop offset="1" stopColor="#6c7bff" /></linearGradient></defs>
+            <defs><linearGradient id="tour-g" x1="0" y1="1" x2="1" y2="0"><stop offset="0" style={{ stopColor: "var(--g1)" }} /><stop offset="0.5" style={{ stopColor: "var(--g2)" }} /><stop offset="1" style={{ stopColor: "var(--g3)" }} /></linearGradient></defs>
             <circle cx="32" cy="32" r="28" />
             <path d="M20 33l8 8 16-17" />
           </svg>

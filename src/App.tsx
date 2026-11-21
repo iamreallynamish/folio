@@ -6,6 +6,8 @@ import { Icon } from "./ui/Icon.tsx";
 import { LogoLoader, LogoMark } from "./ui/Logo.tsx";
 import { reducedMotion } from "./ui/spring.ts";
 import { Tour } from "./screens/Tour.tsx";
+import { Setup } from "./screens/Setup.tsx";
+import { applyAccent } from "./ui/accent.ts";
 import { ConfirmHost, setCacheOwner, ToastHost, useBackground } from "./ui/kit.tsx";
 import { AsciiBackground } from "@/components/AsciiBackground";
 import { Auth } from "./screens/Auth.tsx";
@@ -36,8 +38,24 @@ export function App() {
   const [importing, setImporting] = useState<{ text?: string } | null>(null);
   const [account, setAccount] = useState<Account | "new" | null>(null);
   const [tour, setTour] = useState<{ mode: "first" | "replay"; start: number } | null>(null);
-  // The welcome and tour start by themselves only until the account has finished or skipped them.
-  useEffect(() => { if (user && !user.onboarded) setTour((t) => t ?? { mode: "first", start: user.tourStep }); }, [user?.id]);
+  const [setup, setSetup] = useState<"first" | "replay" | null>(null);
+  // A new account goes through setup first, then (if they want it) the tour; both start by themselves
+  // only until the account has finished or skipped them, and resume where they were left.
+  useEffect(() => {
+    if (!user || user.onboarded) return;
+    if (!user.profile?.setupDone) setSetup((s) => s ?? "first");
+    else setTour((t) => t ?? { mode: "first", start: Math.max(1, user.tourStep) });
+  }, [user?.id]);
+  // The account's accent colours the app and its home-screen icon on every device it signs in on.
+  useEffect(() => { if (user) applyAccent(user.accent); }, [user?.accent]);
+  const finishSetup = useCallback(({ tour: wantsTour, importNow }: { tour: boolean; importNow: boolean }) => {
+    const firstRun = setup === "first";
+    setSetup(null);
+    goRef.current("home");
+    if (wantsTour) setTimeout(() => setTour({ mode: firstRun ? "first" : "replay", start: 1 }), 350);
+    else if (firstRun) api("/me", { method: "PATCH", body: { onboarded: true, tourStep: 0 } }).then((r) => setUser(r.user)).catch(() => {});
+    if (importNow && !wantsTour) setTimeout(() => setImporting({}), 450);
+  }, [setup]);
 
   useEffect(() => {
     api("/me").then((r) => setUser(r.user)).catch(() => setUser(null));
@@ -90,7 +108,7 @@ export function App() {
   goRef.current = go;
   const ctx = useMemo(() => ({
     user: user!, setUser, version, refresh, accounts, categories, go, tab,
-    startTour: () => { go("home"); setTimeout(() => setTour({ mode: "replay", start: 0 }), 350); },
+    startTour: () => setSetup("replay"),
     openTxn: setTxn, openImport: (text?: string) => setImporting({ text }), openAccount: setAccount,
   }), [user, version, refresh, accounts, categories, go, tab]);
 
@@ -121,6 +139,7 @@ export function App() {
       {importing && <ImportSheet initialText={importing.text} onClose={() => setImporting(null)} />}
       {account && <AccountSheet account={account} onClose={() => setAccount(null)} />}
       {tour && <Tour mode={tour.mode} start={tour.start} onClose={() => setTour(null)} />}
+      {setup && <Setup mode={setup} onFinish={finishSetup} />}
       <ConfirmHost />
       <ToastHost />
       </MotionConfig>

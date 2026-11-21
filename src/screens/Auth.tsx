@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { api, type User } from "../api.ts";
 import { CURRENCIES } from "../../shared/money.ts";
-import { AppIcon } from "../ui/Logo.tsx";
+import { LogoLoader } from "../ui/Logo.tsx";
+import { AsciiBackground } from "@/components/AsciiBackground";
+import { useBackground } from "../ui/kit.tsx";
 import { Reveal } from "../ui/Reveal.tsx";
 import { Field, Segmented } from "../ui/kit.tsx";
 
@@ -18,11 +20,14 @@ export function Auth({ onDone }: { onDone: (u: User) => void }) {
     catch (err: any) { setError(err.message); }
     finally { setBusy(false); }
   }
+  const ambient = useBackground();
   return (
-    <div className="auth">
+    <div className="auth with-ascii">
+      {ambient && <AsciiBackground full />}
       <form className="auth-card" onSubmit={submit}>
         <div className="brand">
-          <AppIcon />
+          {/* The app icon, with the loading animation: the small star and the big one trade places. */}
+          <div className="app-icon auth-icon"><LogoLoader size={52} /></div>
           <h1 className="large-title" style={{ fontSize: 44, lineHeight: "48px" }}><Reveal text="Your money, " /><Reveal text="understood." className="grad-words" delay={0.18} /></h1>
           <p className="muted subhead">Spending, budgets, income and investments,<br />built from your own records.</p>
         </div>

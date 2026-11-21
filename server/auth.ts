@@ -12,16 +12,17 @@ export interface User {
   id: number; email: string; name: string; base_currency: string; monthly_budget_minor: number | null;
   alert_threshold: number; last_reviewed_at: string; av_key_enc: string | null; anthropic_key_enc: string | null;
   ingest_token_hash: string | null; created_at: string; pass_hash: string; onboarded_at: string | null; tour_step: number;
+  accent: string | null; profile: string | null; market_symbols: string | null;
 }
 declare global { namespace Express { interface Request { user: User } } }
 
 export class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
 
-/** The cards this instance is set up for; balances stay unknown until a bank message states one. */
-const STARTER_CARDS = [
-  { bank: "ICICI Bank", card_type: "Student Forex Prepaid Card", last4: "0817", currency: "JPY", theme: "icici-student" },
-  { bank: "Axis Bank", card_type: "Privilege Credit Card", last4: "7117", currency: "JPY", theme: "axis-privilege" },
-];
+/** First-run setup answers, as stored. Unknown keys are dropped. */
+export interface Profile { goals?: string[]; incomes?: string[]; setupStep?: number; setupDone?: boolean }
+export function parseProfile(raw: string | null | undefined): Profile {
+  try { const p = raw ? JSON.parse(raw) : {}; return p && typeof p === "object" ? p : {}; } catch { return {}; }
+}
 
 /**
  * Rate limiter for credential endpoints, kept in the database so it holds across
@@ -51,6 +52,8 @@ export function publicUser(u: User) {
     id: u.id, email: u.email, name: u.name, baseCurrency: u.base_currency, monthlyBudgetMinor: u.monthly_budget_minor,
     alertThreshold: u.alert_threshold, lastReviewedAt: u.last_reviewed_at,
     hasMarketKey: !!u.av_key_enc, hasAssistantKey: !!u.anthropic_key_enc, hasIngestToken: !!u.ingest_token_hash, onboarded: !!u.onboarded_at, tourStep: u.tour_step ?? 0,
+    accent: u.accent ?? "folio", profile: parseProfile(u.profile),
+    marketSymbols: ((): string[] => { try { const v = JSON.parse(u.market_symbols ?? "[]"); return Array.isArray(v) ? v : []; } catch { return []; } })(),
   };
 }
 
@@ -89,8 +92,6 @@ export async function register(req: Request, res: Response) {
     // One statement each for categories and cards: sign-up is a few round trips, not twenty.
     await run(`INSERT INTO categories(user_id,key,name,icon,slot,kind) VALUES ${DEFAULT_CATEGORIES.map(() => "(?,?,?,?,?,?)").join(",")}`,
       ...DEFAULT_CATEGORIES.flatMap((c) => [uid, c.key, c.name, c.icon, c.slot, c.kind]));
-    await run(`INSERT INTO accounts(user_id,kind,bank,name,card_type,last4,currency,theme,created_at) VALUES ${STARTER_CARDS.map(() => "(?,?,?,?,?,?,?,?,?)").join(",")}`,
-      ...STARTER_CARDS.flatMap((c) => [uid, "card", c.bank, `${c.bank} ${c.card_type}`, c.card_type, c.last4, c.currency, c.theme, t]));
     return uid;
   });
   await startSession(res, id);

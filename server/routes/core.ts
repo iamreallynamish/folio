@@ -1,6 +1,9 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { all, get, run, insert, now, tx } from "../db.js";
-import { HttpError, publicUser, type User } from "../auth.js";
+import { HttpError, parseProfile, publicUser, type Profile, type User } from "../auth.js";
+import { ACCENTS } from "../../shared/accents.js";
+import { suggestTheme } from "../../shared/cardThemes.js";
+import { MAX_WATCH, SYMBOL_RE } from "../../shared/tradingview.js";
 import { encrypt, randomToken, sha256 } from "../crypto.js";
 import { CURRENCIES, convertMinor, toMinor } from "../../shared/money.js";
 import { identifyMerchant, merchantKey } from "../../shared/merchants.js";
@@ -26,6 +29,9 @@ async function owned<T = any>(table: string, id: unknown, userId: number): Promi
 }
 
 export const core = Router();
+/** What setup can record: goals and ways money comes in. */
+const GOALS = ["spending", "budget", "scholarship", "investing", "saving"];
+const INCOMES = ["scholarship", "allowance", "part-time", "salary", "none"];
 
 // ---------- profile and settings ----------
 core.get("/me", h(async (req, res) => res.json({ user: publicUser(req.user) })));
@@ -37,8 +43,32 @@ core.patch("/me", h(async (req, res) => {
   const th = b.alertThreshold !== undefined ? Math.min(100, Math.max(50, Math.round(Number(b.alertThreshold)) || 80)) : u.alert_threshold;
   const name = b.name !== undefined ? String(b.name).trim().slice(0, 60) || bad("Enter your name.") : u.name;
   await run("UPDATE users SET name=?, base_currency=?, monthly_budget_minor=?, alert_threshold=? WHERE id=?", name, base, budget, th, u.id);
+  if (b.marketSymbols !== undefined) {
+    const list = Array.isArray(b.marketSymbols) ? [...new Set(b.marketSymbols.map((x: unknown) => String(x).trim().toUpperCase()))] as string[] : bad("Send a list of symbols.");
+    if (list.length > MAX_WATCH) bad(`Watch up to ${MAX_WATCH} symbols.`);
+    if (list.some((x) => !SYMBOL_RE.test(x))) bad("One of those isn't a valid TradingView symbol.");
+    await run("UPDATE users SET market_symbols=? WHERE id=?", JSON.stringify(list), u.id);
+  }
+  if (b.accent !== undefined) {
+    if (!ACCENTS.some((a) => a.key === b.accent)) bad("Unknown colour.");
+    await run("UPDATE users SET accent=? WHERE id=?", b.accent, u.id);
+  }
+  // Setup answers merge into what's stored; only known keys and values are kept.
+  let profile: Profile = parseProfile(u.profile);
+  if (b.profile && typeof b.profile === "object") {
+    const list = (v: unknown, allowed: string[]) => (Array.isArray(v) ? [...new Set(v.map(String))].filter((x) => allowed.includes(x)) : undefined);
+    const p = b.profile;
+    const goals = list(p.goals, GOALS), incomes = list(p.incomes, INCOMES);
+    profile = {
+      ...profile,
+      ...(goals ? { goals } : {}), ...(incomes ? { incomes } : {}),
+      ...(p.setupStep !== undefined ? { setupStep: Math.max(0, Math.min(20, Math.trunc(Number(p.setupStep)) || 0)) } : {}),
+      ...(p.setupDone !== undefined ? { setupDone: !!p.setupDone } : {}),
+    };
+  }
   // onboarded:false asks for the first-run setup again the next time the app opens.
-  if (b.onboarded === false) await run("UPDATE users SET onboarded_at=NULL, tour_step=0 WHERE id=?", u.id);
+  if (b.onboarded === false) { profile = { ...profile, setupDone: false, setupStep: 0 }; await run("UPDATE users SET onboarded_at=NULL, tour_step=0 WHERE id=?", u.id); }
+  if (b.profile || b.onboarded === false) await run("UPDATE users SET profile=? WHERE id=?", JSON.stringify(profile), u.id);
   if (b.onboarded === true && !u.onboarded_at) await run("UPDATE users SET onboarded_at=? WHERE id=?", now(), u.id);
   // Guided-tour progress, so a reload resumes at the same step.
   if (b.tourStep !== undefined) await run("UPDATE users SET tour_step=? WHERE id=?", Math.max(0, Math.min(10, Math.trunc(Number(b.tourStep)) || 0)), u.id);
@@ -106,7 +136,7 @@ function accountFields(b: any, prev?: any) {
     kind, last4, name, bank: b.bank !== undefined ? String(b.bank ?? "").trim().slice(0, 40) || null : prev?.bank ?? null,
     cardType: b.cardType !== undefined ? String(b.cardType ?? "").trim().slice(0, 40) || null : prev?.card_type ?? null,
     currency: b.currency !== undefined ? ccy(b.currency) : prev?.currency ?? "JPY",
-    theme: THEMES.includes(b.theme) ? b.theme : prev?.theme ?? "graphite",
+    theme: THEMES.includes(b.theme) ? b.theme : prev?.theme ?? null,
     cardLine: ["auto", "cycle", "topup", "updated"].includes(b.cardLine) ? b.cardLine : prev?.card_line ?? "auto",
     statementDay: b.statementDay !== undefined ? day(b.statementDay) : prev?.statement_day ?? null,
     dueDay: b.dueDay !== undefined ? day(b.dueDay) : prev?.due_day ?? null,
@@ -121,6 +151,7 @@ function day(v: unknown): number | null {
 }
 core.post("/accounts", h(async (req, res) => {
   const f = accountFields(req.body);
+  if (!f.theme) f.theme = suggestTheme(f.bank, f.cardType, (await get<{ n: number }>("SELECT COUNT(*) n FROM accounts WHERE user_id = ?", req.user.id))!.n);
   const id = await insert("INSERT INTO accounts(user_id,kind,bank,name,card_type,last4,currency,theme,card_line,statement_day,due_day,last_topup,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
     req.user.id, f.kind, f.bank, f.name, f.cardType, f.last4, f.currency, f.theme, f.cardLine, f.statementDay, f.dueDay, f.lastTopup, now());
   await setBalance(id, req.body.balance, f.currency);

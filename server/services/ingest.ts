@@ -4,6 +4,7 @@ import { sha256 } from "../crypto.js";
 import { parseSms, normaliseSms, type ParsedSms } from "../../shared/sms.js";
 import { merchantKey } from "../../shared/merchants.js";
 import { DEFAULT_CATEGORIES } from "../../shared/categories.js";
+import { suggestTheme } from "../../shared/cardThemes.js";
 
 export interface IncomingSms { text: string; date?: string }
 export type ItemStatus = "new" | "duplicate" | "ignored" | "balance";
@@ -67,8 +68,10 @@ async function ensureAccount(userId: number, p: ParsedSms) {
   if (found || !p.last4) return found;
   const isCard = /card/i.test(p.instrument ?? "");
   const name = [p.bank, isCard ? p.instrument : "Account"].filter(Boolean).join(" ");
-  const id = await insert("INSERT INTO accounts(user_id,kind,bank,name,card_type,last4,currency,created_at) VALUES (?,?,?,?,?,?,?,?)",
-    userId, isCard ? "card" : "bank", p.bank ?? null, name, isCard ? p.instrument! : null, p.last4, p.currency ?? p.balanceCurrency ?? "JPY", now());
+  const count = (await get<{ n: number }>("SELECT COUNT(*) n FROM accounts WHERE user_id = ?", userId))!.n;
+  const id = await insert("INSERT INTO accounts(user_id,kind,bank,name,card_type,last4,currency,theme,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+    userId, isCard ? "card" : "bank", p.bank ?? null, name, isCard ? p.instrument! : null, p.last4, p.currency ?? p.balanceCurrency ?? "JPY",
+    suggestTheme(p.bank, p.instrument, count), now());
   return await get<any>("SELECT * FROM accounts WHERE id = ?", id);
 }
 export async function ensureWallet(userId: number, name: string, currency: string) {

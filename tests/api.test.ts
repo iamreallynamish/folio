@@ -25,12 +25,13 @@ function client() {
 }
 const A = client(), B = client();
 
-test("register, starter cards have no invented balance", async () => {
+test("register: a new account starts with no cards", async () => {
   assert.equal((await A("GET", "/me")).status, 401);
   assert.equal((await A("POST", "/auth/register", { email: "a@example.com", name: "A", password: "short" })).status, 400);
   assert.equal((await A("POST", "/auth/register", { email: "a@example.com", name: "A", password: "correct horse battery" })).status, 201);
+  // Nobody starts with someone else's cards: a new account has none until the person adds theirs.
   const { accounts } = (await A("GET", "/accounts")).body;
-  assert.deepEqual(accounts.map((a: any) => [a.bank, a.last4, a.balanceMinor]), [["ICICI Bank", "0817", null], ["Axis Bank", "7117", null]]);
+  assert.deepEqual(accounts, []);
 });
 
 test("importing the four sample messages", async () => {
@@ -275,4 +276,31 @@ test("card line settings: billing cycle days and last top-up (set, or from money
   await D("POST", "/transactions", { type: "transfer", amount: "50000", currency: "JPY", date: "2026-11-08", merchant: "Forex reload", transferAccountId: icici.id });
   const after = (await D("GET", "/accounts")).body.accounts.find((x: any) => x.id === icici.id);
   assert.equal(after.lastTopup, "2026-11-08");
+});
+
+
+test("setup: accent, answers, watchlist and card looks are personal", async () => {
+  const E = D; // sign-ups are rate-limited; the shared test account has never been through setup
+  let u = (await E("GET", "/me")).body.user;
+  assert.equal(u.accent, "folio");
+  assert.deepEqual(u.marketSymbols, [], "no one else's stocks");
+  assert.equal(u.profile.setupDone, undefined);
+  u = (await E("PATCH", "/me", { accent: "violet", profile: { goals: ["budget", "investing", "nonsense"], incomes: ["scholarship"], setupStep: 3 } })).body.user;
+  assert.equal(u.accent, "violet");
+  assert.deepEqual(u.profile.goals, ["budget", "investing"], "unknown answers are dropped");
+  assert.equal(u.profile.setupStep, 3);
+  assert.equal((await E("PATCH", "/me", { accent: "chartreuse" })).status, 400);
+  u = (await E("PATCH", "/me", { profile: { setupDone: true } })).body.user;
+  assert.deepEqual([u.profile.goals, u.profile.setupDone], [["budget", "investing"], true], "answers merge");
+  u = (await E("PATCH", "/me", { marketSymbols: ["NASDAQ:AAPL", "bse:tcs"] })).body.user;
+  assert.deepEqual(u.marketSymbols, ["NASDAQ:AAPL", "BSE:TCS"]);
+  assert.equal((await E("PATCH", "/me", { marketSymbols: ["<script>"] })).status, 400);
+  // Their own cards: matching art where Folio has it, otherwise colours in turn.
+  const c1 = (await E("POST", "/accounts", { kind: "card", bank: "ICICI Bank", cardType: "Forex Prepaid Card", name: "ICICI forex", last4: "1234", currency: "JPY" })).body.account;
+  const c2 = (await E("POST", "/accounts", { kind: "card", bank: "HDFC Bank", cardType: "Credit Card", name: "HDFC credit", last4: "5678", currency: "INR" })).body.account;
+  assert.equal(c1.theme, "icici-student");
+  assert.notEqual(c2.theme, "icici-student");
+  // Asking for setup again resets its progress.
+  u = (await E("PATCH", "/me", { onboarded: false })).body.user;
+  assert.deepEqual([u.profile.setupDone, u.profile.setupStep], [false, 0]);
 });

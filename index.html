@@ -7,12 +7,12 @@
     <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Folio" />
-    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/icon.svg" />
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/folio.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/folio-180.png" />
+    <link rel="manifest" href="/manifests/folio.webmanifest" />
     <title>Folio</title>
-    <!-- Apply the chosen theme before the first paint, so dark mode never flashes light while the app loads. -->
-    <script>try{var t=localStorage.getItem("folio-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
+    <!-- Apply the chosen theme and accent before the first paint (no light flash, no colour flash) and point the icons at the accent. -->
+    <script>try{var d=document.documentElement,t=localStorage.getItem("folio-theme"),a=localStorage.getItem("folio-accent");if(t==="light"||t==="dark")d.dataset.theme=t;if(a&&/^[a-z]+$/.test(a)){d.dataset.accent=a;document.querySelector('link[rel="icon"]').href="/icons/"+a+".svg";document.querySelector('link[rel="apple-touch-icon"]').href="/icons/"+a+"-180.png";document.querySelector('link[rel="manifest"]').href="/manifests/"+a+".webmanifest"}}catch(e){}</script>
   </head>
   <body>
     <div id="root"></div>

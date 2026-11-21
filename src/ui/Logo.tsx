@@ -11,7 +11,7 @@ export function LogoMark({ size = 28, mono = false }: { size?: number; mono?: bo
     <svg width={size} height={size} viewBox="0 0 100 100" role="img" aria-label="Folio">
       <defs>
         <linearGradient id={id} x1="0.1" y1="1" x2="0.9" y2="0">
-          <stop offset="0" stopColor="#19c37d" /><stop offset="0.5" stopColor="#20b7c9" /><stop offset="1" stopColor="#6c7bff" />
+          <stop offset="0" style={{ stopColor: "var(--g1)" }} /><stop offset="0.5" style={{ stopColor: "var(--g2)" }} /><stop offset="1" style={{ stopColor: "var(--g3)" }} />
         </linearGradient>
       </defs>
       <path d="M46 6Q51 51 90 56Q51 61 46 96Q41 61 8 56Q41 51 46 6Z" fill={fill} />
@@ -45,7 +45,7 @@ export function LogoLoader({ size = 64 }: { size?: number }) {
     <svg className="logo-loader" width={size} height={size} viewBox="0 0 100 100" role="img" aria-label="Loading Folio">
       <defs>
         <linearGradient id={id} x1="0.1" y1="1" x2="0.9" y2="0">
-          <stop offset="0" stopColor="#19c37d" /><stop offset="0.5" stopColor="#20b7c9" /><stop offset="1" stopColor="#6c7bff" />
+          <stop offset="0" style={{ stopColor: "var(--g1)" }} /><stop offset="0.5" style={{ stopColor: "var(--g2)" }} /><stop offset="1" style={{ stopColor: "var(--g3)" }} />
         </linearGradient>
       </defs>
       <g className="lm-big">{star}</g>
