@@ -304,3 +304,15 @@ test("setup: accent, answers, watchlist and card looks are personal", async () =
   u = (await E("PATCH", "/me", { onboarded: false })).body.user;
   assert.deepEqual([u.profile.setupDone, u.profile.setupStep], [false, 0]);
 });
+
+test("home insights: what changed, plus insights from the person's own records", async () => {
+  await D("PATCH", "/me", { monthlyBudget: "60000", profile: { goals: ["budget", "scholarship"] } });
+  const ins = (await D("GET", "/home")).body.insights;
+  assert.equal(typeof ins.change, "string");
+  assert.ok(ins.change.length > 10);
+  assert.ok(Array.isArray(ins.more) && ins.more.length > 0);
+  for (const i of ins.more) assert.ok(["info", "good", "warn"].includes(i.tone));
+  // Warnings come first; nothing is invented (every insight refers to something recorded or a suggestion).
+  const firstOk = ins.more.findIndex((i: any) => i.tone !== "warn");
+  assert.ok(firstOk === -1 || ins.more.slice(firstOk).every((i: any) => i.tone !== "warn"));
+});

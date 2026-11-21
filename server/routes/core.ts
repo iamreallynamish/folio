@@ -9,6 +9,7 @@ import { CURRENCIES, convertMinor, toMinor } from "../../shared/money.js";
 import { identifyMerchant, merchantKey } from "../../shared/merchants.js";
 import { messagesFromFile, splitMessages } from "../../shared/sms.js";
 import { categoryByKey, ensureWallet, fingerprint, findDuplicate, importMessages, previewMessages, resolveCategory, type IncomingSms } from "../services/ingest.js";
+import { homeInsights } from "../services/insights.js";
 import { incomeSummary, monthComparison, monthSummary, rates, recurring, thisMonth, today, userRow } from "../services/summary.js";
 
 export const h = (fn: (req: Request, res: Response) => unknown) => (req: Request, res: Response, next: NextFunction) =>
@@ -418,8 +419,10 @@ core.get("/home", h(async (req, res) => {
     const part = d.parts.find((x) => x.slot === r.slot);
     if (part) part.value += v; else d.parts.push({ slot: r.slot, value: v });
   }
+  const totalTxns = (await get<{ n: number }>("SELECT COUNT(*) n FROM transactions WHERE user_id = ?", u.id))!.n;
+  const insights = await homeInsights(u, { today: today(), summary, fresh, income, totalTxns });
   res.json({
-    user: publicUser(u), accounts: await listAccounts(u.id), summary, week,
+    user: publicUser(u), accounts: await listAccounts(u.id), summary, week, insights,
     sinceLastVisit: { since: u.last_reviewed_at, count: fresh.length, totals: [...totals.values()], transactions: fresh, changes },
     recent: await queryTransactions(u, {}, 8), needsReview: review, incomeTotals: income.totals,
   });

@@ -14,7 +14,7 @@ import { TextEffect } from "@/components/ui/text-effect";
 import { LogoLoader } from "../ui/Logo.tsx";
 import { Reveal } from "../ui/Reveal.tsx";
 import { reducedMotion } from "../ui/spring.ts";
-import { toast } from "../ui/kit.tsx";
+import { formatMoney } from "../format.ts";
 
 interface Step { id: string; tab: Tab; planView?: "budget" | "income"; title: string; body: string }
 const ALL_STEPS: Step[] = [
@@ -37,7 +37,7 @@ const PAD = 8;
 type Rect = { top: number; left: number; width: number; height: number; radius: number };
 
 export function Tour({ mode, start, onClose }: { mode: "first" | "replay"; start: number; onClose: () => void }) {
-  const { user, setUser, go, tab, openImport } = useApp();
+  const { user, setUser, go, tab, openImport, accounts } = useApp();
   const first = user.name.split(" ")[0];
   // Only the parts this person said they care about in setup (everything, for accounts set up before it).
   const goals = user.profile?.goals ?? [], incomes = user.profile?.incomes ?? [], answered = !!user.profile?.setupDone;
@@ -160,8 +160,7 @@ export function Tour({ mode, start, onClose }: { mode: "first" | "replay"; start
     if (step < STEPS.length - 1) { setStep(step + 1); save({ tourStep: step + 2 }); }
     else {
       save({ onboarded: true, tourStep: 0 }); go("home");
-      // After setup's own celebration, the tour simply ends; otherwise it closes with "You're all set".
-      if (answered) { toast("You're ready. Enjoy Folio!"); onClose(); } else setPhase("done");
+      setPhase("done");
     }
   };
   const back = () => { if (step > 0) { setStep(step - 1); save({ tourStep: step }); } };
@@ -201,6 +200,17 @@ export function Tour({ mode, start, onClose }: { mode: "first" | "replay"; start
   }
 
   if (phase === "done") {
+    // Personal: what they set up, and the next step that fits what they said they care about.
+    const cards = accounts.filter((a) => a.kind === "card" || a.kind === "bank");
+    const budget = user.monthlyBudgetMinor != null ? formatMoney(user.monthlyBudgetMinor, user.baseCurrency).replace(/\.00$/, "") : null;
+    const firstCard = cards[0] ? `${cards[0].bank ?? cards[0].name}${cards[0].last4 ? ` ••${cards[0].last4}` : ""}` : null;
+    const line =
+      cards.length === 0 ? "Bring in your bank messages and your cards and spending appear by themselves."
+      : goals.includes("budget") && budget ? `Your ${budget} budget is ready. Bring in your bank messages and every purchase from ${firstCard} counts toward it.`
+      : goals.includes("scholarship") ? "Add your scholarship in Plan → Income, then bring in your bank messages so every payment is matched."
+      : goals.includes("investing") ? `Add your shares in Invest, and bring in messages from ${firstCard} to see where your money goes.`
+      : `Bring in your bank messages from ${firstCard} and Folio sorts every purchase for you.`;
+    const personal = { line, chips: [budget && `${budget} a month`, `${cards.length} ${cards.length === 1 ? "card" : "cards"}`, user.baseCurrency].filter(Boolean) as string[] };
     return (
       <div className="tour-veil" role="dialog" aria-modal="true" aria-label="Setup complete">
         <div className="tour-welcome">
@@ -210,7 +220,8 @@ export function Tour({ mode, start, onClose }: { mode: "first" | "replay"; start
             <path d="M20 33l8 8 16-17" />
           </svg>
           <h1 className="tour-hero small"><Reveal text="You're all set, " delay={0.35} /><Reveal text={`${first}!`} className="grad-words" delay={0.6} /></h1>
-          <TextEffect per="word" preset="fade" delay={1} className="tour-sub">Start by bringing in your bank messages. Folio does the rest.</TextEffect>
+          <TextEffect per="word" preset="fade" delay={1} className="tour-sub">{personal.line}</TextEffect>
+          {personal.chips.length > 0 && <div className="setup-summary tour-chips">{personal.chips.map((c) => <span key={c} className="badge">{c}</span>)}</div>}
           <div className="tour-start in" style={{ animationDelay: "1.4s" }}>
             <button className="btn tour-cta" onClick={() => finish(true)}>Import bank messages</button>
             <button className="btn plain small tour-later" onClick={() => finish()}>Start using Folio</button>

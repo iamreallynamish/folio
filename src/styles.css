@@ -975,3 +975,12 @@ h1.text-reveal { font-size: 32px; font-weight: 600; letter-spacing: -0.05em; }
 .auth.with-ascii > .auth-card { position: relative; z-index: 1; }
 .ascii-bg.full { -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
 .auth-icon { width: 76px; height: 76px; display: grid; place-items: center; background: linear-gradient(135deg, #16181d, #06070a); }
+
+/* Home: the two lines under the greeting */
+.insights { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; max-width: 620px; }
+.insights p { margin: 0; font-size: 16px; line-height: 22px; }
+.insight-change { color: var(--label); font-weight: 500; }
+.insight-more { display: flex; align-items: baseline; gap: 8px; color: var(--label-2); }
+.insight-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: linear-gradient(135deg, var(--g1), var(--g3)); transform: translateY(-1px); }
+.insight-more.warn { color: var(--warning); }
+.insight-more.warn .insight-dot { background: var(--warning); }

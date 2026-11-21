@@ -66,6 +66,7 @@ export function Home() {
       <div>
         <div className="eyebrow hide-desktop">{new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</div>
         <h1 className="greeting"><Reveal text={`${greeting}, `} once="greeting" /><Reveal text={first} className="name" delay={0.12} once="greeting-name" /></h1>
+        {data?.insights && <Insights change={data.insights.change} more={data.insights.more} />}
       </div>
     </header>
   );
@@ -203,6 +204,32 @@ export function Home() {
       </div>
       </div>
       </div>
+    </div>
+  );
+}
+
+/** Which insight to show this visit: a new one each time the app is opened, the same one while it stays open. */
+function visitIndex(): number {
+  try {
+    let n = Number(sessionStorage.getItem("folio-visit"));
+    if (!sessionStorage.getItem("folio-visit")) {
+      n = (Number(localStorage.getItem("folio-visits")) || 0) + 1;
+      localStorage.setItem("folio-visits", String(n)); sessionStorage.setItem("folio-visit", String(n));
+    }
+    return n;
+  } catch { return 0; }
+}
+
+/**
+ * Two lines under the greeting: what changed since the last visit, and one insight from the person's
+ * own records, chosen by what they said they care about. Warnings always come first.
+ */
+function Insights({ change, more }: { change: string; more: { key: string; text: string; tone: string }[] }) {
+  const pick = more.length ? (more[0].tone === "warn" ? more[0] : more[Math.max(0, visitIndex() - 1) % more.length]) : null;
+  return (
+    <div className="insights" aria-live="polite">
+      <Reveal as="p" text={change} className="insight-change" delay={0.25} once={`insight-1-${change}`} />
+      {pick && <p className={`insight-more ${pick.tone}`}><span className="insight-dot" aria-hidden="true" /><Reveal text={pick.text} delay={0.45} once={`insight-2-${pick.key}-${pick.text}`} /></p>}
     </div>
   );
 }
