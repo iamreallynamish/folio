@@ -46,6 +46,12 @@ export function Sheet({ title, onClose, children, action, cancelLabel = "Cancel"
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const backdrop = useRef<HTMLDivElement>(null);
+  // While any sheet is open, <html data-sheet> lets layers hidden under the dimmed backdrop stop working.
+  useEffect(() => {
+    const r = document.documentElement;
+    r.dataset.sheet = String((Number(r.dataset.sheet) || 0) + 1);
+    return () => { const n = (Number(r.dataset.sheet) || 1) - 1; if (n) r.dataset.sheet = String(n); else delete r.dataset.sheet; };
+  }, []);
   const anim = useRef<SpringHandle | null>(null);
   const y = useRef(0); // sheet offset in px (0 = open); on desktop the open progress is derived from it
   const drag = useRef<{ start: number; tracker: VelocityTracker } | null>(null);

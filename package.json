@@ -8,7 +8,8 @@
     "build": "vite build",
     "start": "NODE_ENV=production tsx server/index.ts",
     "test": "tsx --test tests/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "motion": "node scripts/motion-check.cjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",

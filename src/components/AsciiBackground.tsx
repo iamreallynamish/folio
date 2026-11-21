@@ -188,9 +188,13 @@ export function AsciiBackground({ params = MAN_DITHER, full = false }: { params?
       ctx.fill();
     };
 
+    // While something else is moving (a page change, a sheet, the tour, setup) the background holds
+    // still, so every frame goes to that motion. It's dimmed or covered then anyway.
+    const busy = () => !!document.documentElement.dataset.nav || !!document.querySelector(".sheet-backdrop, .tour-layer, .tour-veil, .setup");
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
       if (now - last < 1000 / FPS) return;
+      if (busy()) { last = now; return; }
       last = now;
       draw(now);
     };

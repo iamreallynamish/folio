@@ -136,14 +136,14 @@ export function Setup({ mode, onFinish }: { mode: "first" | "replay"; onFinish: 
             <Icon name={step === 0 ? "x" : "back"} />
           </button>
           <div className="setup-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} aria-label="Setup progress">
-            <motion.i animate={{ width: `${Math.max(4, progress * 100)}%` }} transition={{ type: "spring", visualDuration: 0.5, bounce: 0.25 }} />
+            <motion.i initial={false} animate={{ scaleX: Math.max(0.04, progress) }} transition={{ type: "spring", visualDuration: 0.5, bounce: 0 }} />
           </div>
         </header>
       )}
 
       <div className="setup-body">
         <AnimatePresence mode="wait" initial={false}>
-          <motion.div key={s} className="setup-step" {...slide} transition={{ type: "spring", visualDuration: 0.35, bounce: 0.12 }}>
+          <motion.div key={s} className="setup-step" {...slide} transition={{ type: "spring", visualDuration: 0.35, bounce: 0 }}>
             {s === "done" ? <Done first={first} goals={goals} currency={currency} budgetMinor={budget === "set" ? budgetValue : null} accent={accent} cards={cards} /> : (
               <>
                 <Guide text={reply ?? QUESTION[s](first)} big={s === "hello"} hop={reply} />
@@ -337,7 +337,7 @@ function Done({ first, goals, currency, budgetMinor, accent, cards }: { first: s
           initial={{ x: 0, y: 0, rotate: 0, opacity: 1 }} animate={{ x: b.x, y: [0, b.y, b.y + 520], rotate: b.r, opacity: [1, 1, 0] }}
           transition={{ duration: b.d + 1, ease: [0.2, 0.7, 0.4, 1], times: [0, 0.35, 1] }} />
       ))}</div>}
-      <motion.div className="done-mark" initial={reduce ? false : { scale: 0.4, y: 30, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }} transition={{ type: "spring", visualDuration: 0.5, bounce: 0.45 }}>
+      <motion.div className="done-mark" initial={reduce ? false : { scale: 0.4, y: 30, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }} transition={{ type: "spring", visualDuration: 0.5, bounce: 0.3 }}>
         <LogoMark size={112} />
       </motion.div>
       <motion.h1 className="setup-title" initial={reduce ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>

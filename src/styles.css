@@ -1,6 +1,7 @@
 /* Folio design system — tokens first, components after. Follows Apple's Human Interface Guidelines:
    system type scale, grouped inset lists, 44pt targets, translucent bars, light and dark. */
 :root {
+  --ease-out: cubic-bezier(0.25, 0.1, 0.25, 1); --ease-in-out: cubic-bezier(0.42, 0, 0.58, 1);
   --g1: #19c37d; --g2: #20b7c9; --g3: #6c7bff; /* brand gradient; recoloured by the accent (shared/accents.ts) */
   color-scheme: light dark;
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, sans-serif;
@@ -107,7 +108,7 @@ h1, h2, h3, p { margin: 0; }
 
 .tabbar { position: fixed; inset: auto 0 0 0; z-index: 20; display: flex; justify-content: space-around; padding: 6px 8px calc(env(safe-area-inset-bottom) + 4px);
   background: var(--bar); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-top: 0.5px solid var(--separator); }
-.tab { flex: 1; max-width: 96px; min-height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--label-3); font-size: 10px; font-weight: 500; transition: color 0.2s; }
+.tab { flex: 1; max-width: 96px; min-height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--label-3); font-size: 10px; font-weight: 500; transition: color 0.2s var(--ease-out); }
 .tab[aria-current="page"] { color: var(--accent); }
 .tab svg { width: 25px; height: 25px; }
 .sidebar { display: none; }
@@ -121,7 +122,7 @@ h1, h2, h3, p { margin: 0; }
   .sidebar { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100dvh; padding: 22px 14px; border-right: 0.5px solid var(--separator);
     background: color-mix(in srgb, var(--surface) 55%, var(--bg)); }
   .sidebar .brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 22px; font: 700 21px var(--font-round); letter-spacing: -0.3px; }
-  .side-link { display: flex; align-items: center; gap: 11px; height: 40px; padding: 0 10px; border-radius: 10px; font-size: 15px; font-weight: 500; color: var(--label); text-align: left; transition: background 0.15s; }
+  .side-link { display: flex; align-items: center; gap: 11px; height: 40px; padding: 0 10px; border-radius: 10px; font-size: 15px; font-weight: 500; color: var(--label); text-align: left; transition: background 0.15s var(--ease-out); }
   .side-link svg { width: 20px; height: 20px; color: var(--accent); }
   .side-link:hover { background: var(--fill); }
   .side-link[aria-current="page"] { background: var(--accent); color: var(--on-accent); }
@@ -137,13 +138,13 @@ h1, h2, h3, p { margin: 0; }
 .list { background: var(--surface); border-radius: var(--r-l); box-shadow: var(--shadow-1); overflow: hidden; }
 .list > * + * { border-top: 0.5px solid var(--separator); }
 .cell { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 10px 16px; width: 100%; text-align: left; }
-button.cell { transition: background 0.15s; }
+button.cell { transition: background 0.15s var(--ease-out); }
 button.cell:hover { background: var(--fill); }
 button.cell:active { background: var(--fill-strong); }
 .cell .chev { color: var(--label-3); width: 14px; height: 14px; flex: none; }
 .cell .value { color: var(--label-2); margin-left: auto; text-align: right; }
 
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 18px; border-radius: 12px; font-weight: 600; font-size: 16px; white-space: nowrap; transition: transform 0.15s var(--ease), opacity 0.15s, background 0.15s; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 18px; border-radius: 12px; font-weight: 600; font-size: 16px; white-space: nowrap; transition: transform 0.15s var(--ease), opacity 0.15s var(--ease-out), background 0.15s var(--ease-out); }
 .btn:active { transform: scale(0.97); }
 .btn:disabled { opacity: 0.45; cursor: default; }
 .btn.primary { background: var(--accent); color: var(--on-accent); }
@@ -160,7 +161,7 @@ button.cell:active { background: var(--fill-strong); }
 .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--g1), var(--g3)); color: #fff; font-weight: 700; font-size: 15px; display: grid; place-items: center; }
 
 .segmented { display: flex; padding: 2px; border-radius: 9px; background: var(--fill); }
-.segmented button { flex: 1; min-height: 32px; padding: 0 12px; border-radius: 7px; font-size: 13px; font-weight: 500; white-space: nowrap; transition: background 0.2s var(--ease), box-shadow 0.2s; }
+.segmented button { flex: 1; min-height: 32px; padding: 0 12px; border-radius: 7px; font-size: 13px; font-weight: 500; white-space: nowrap; transition: background 0.2s var(--ease), box-shadow 0.2s var(--ease-out); }
 .segmented button[aria-pressed="true"] { background: var(--surface); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04); font-weight: 600; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .segmented button[aria-pressed="true"] { background: #636366; } }
 :root[data-theme="dark"] .segmented button[aria-pressed="true"] { background: #636366; }
@@ -195,7 +196,7 @@ select.input { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://ww
 .notice.over { background: var(--negative-soft); color: var(--negative); }
 
 /* ---------- sheet ---------- */
-.sheet-backdrop { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, 0.36); display: flex; align-items: flex-end; justify-content: center; animation: fade 0.25s ease both; }
+.sheet-backdrop { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, 0.36); display: flex; align-items: flex-end; justify-content: center; animation: fade 0.25s var(--ease-out) both; }
 @keyframes fade { from { opacity: 0; } }
 .sheet { width: 100%; max-width: 560px; max-height: 92dvh; display: flex; flex-direction: column; background: var(--bg); border-radius: 22px 22px 0 0; box-shadow: var(--shadow-2); animation: sheet-up 0.45s var(--ease) both; }
 @keyframes sheet-up { from { transform: translateY(100%); } }
@@ -261,7 +262,7 @@ button.pay-card:active { transform: scale(0.985); }
 .tip { position: absolute; pointer-events: none; z-index: 5; padding: 7px 10px; border-radius: 10px; background: var(--surface-2); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18), 0 0 0 0.5px var(--separator); font-size: 12px; line-height: 16px; white-space: nowrap; transform: translate(-50%, -100%); }
 .tip b { display: block; font-size: 14px; font-variant-numeric: tabular-nums; }
 .legend { display: flex; flex-direction: column; }
-.legend-row { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 6px; border-radius: 10px; width: 100%; text-align: left; font-size: 15px; transition: background 0.15s, opacity 0.2s; }
+.legend-row { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 6px; border-radius: 10px; width: 100%; text-align: left; font-size: 15px; transition: background 0.15s var(--ease-out), opacity 0.2s var(--ease-out); }
 .legend-row:hover, .legend-row.on { background: var(--fill); }
 .legend-row.dim { opacity: 0.45; }
 .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
@@ -305,7 +306,7 @@ button.pay-card:active { transform: scale(0.985); }
   --separator: rgba(0, 0, 0, 0.08); --bar: rgba(251, 251, 253, 0.72);
   --shadow-1: 0 2px 6px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(0, 0, 0, 0.07);
   --r-l: 24px; --r-xl: 28px;
-  --ease: cubic-bezier(0.28, 0.11, 0.32, 1); --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease: cubic-bezier(0.28, 0.11, 0.32, 1); --spring: cubic-bezier(0.25, 1, 0.5, 1); /* critically damped: no overshoot on UI nobody threw */
 }
 body { letter-spacing: -0.022em; }
 .large-title { font-weight: 800; letter-spacing: -0.045em; }
@@ -313,7 +314,7 @@ body { letter-spacing: -0.022em; }
 .hero { letter-spacing: -0.04em; }
 .grad { background: linear-gradient(100deg, var(--g1) 5%, var(--g2) 45%, var(--g3) 95%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .section-label { text-transform: none; font-size: 20px; line-height: 24px; font-weight: 700; letter-spacing: -0.03em; color: var(--label); padding: 0 4px 10px; }
-.btn { border-radius: 980px; font-weight: 500; transition: background 0.2s var(--ease), transform 0.25s var(--spring), opacity 0.15s; }
+.btn { border-radius: 980px; font-weight: 500; transition: background 0.2s var(--ease), transform 0.25s var(--spring), opacity 0.15s var(--ease-out); }
 .btn:active { transform: scale(0.96); }
 .btn.small { border-radius: 980px; }
 .btn.gray { background: color-mix(in srgb, var(--label) 8%, transparent); }
@@ -422,7 +423,7 @@ body { background: var(--glow) no-repeat fixed, var(--bg); }
 
 /* floating tab bar */
 .tabbar { inset: auto auto calc(env(safe-area-inset-bottom) + 12px) 50%; transform: translateX(-50%); width: min(calc(100% - 28px), 400px); padding: 6px; border-radius: 30px; border: 0; box-shadow: var(--shadow-1), 0 10px 30px rgba(0, 0, 0, 0.18); gap: 2px; }
-.tab { max-width: none; min-height: 48px; border-radius: 24px; font-size: 10px; font-weight: 600; gap: 1px; transition: background 0.3s var(--ease), color 0.2s; }
+.tab { max-width: none; min-height: 48px; border-radius: 24px; font-size: 10px; font-weight: 600; gap: 1px; transition: background 0.3s var(--ease), color 0.2s var(--ease-out); }
 .tab svg { width: 22px; height: 22px; transition: transform 0.4s var(--spring); }
 .tab[aria-current="page"] { color: var(--label); background: var(--fill-strong); }
 .tab[aria-current="page"] svg { transform: scale(1.08); }
@@ -437,7 +438,7 @@ body { background: var(--glow) no-repeat fixed, var(--bg); }
 /* panels and rows */
 .card, .list, .stat-grid { box-shadow: var(--shadow-1); }
 .list > * + * { border-top: 0; }
-.cell { position: relative; min-height: 56px; padding: 11px 16px; transition: background 0.2s; }
+.cell { position: relative; min-height: 56px; padding: 11px 16px; transition: background 0.2s var(--ease-out); }
 .list > * + .cell::before, .list > * + * > .cell::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 0.5px; background: var(--separator); }
 .list > * + .cell:has(> .tx-icon)::before { left: 68px; }
 button.cell:active { background: var(--fill); }
@@ -484,7 +485,7 @@ button.pay-card:hover { transform: translateY(-4px); } button.pay-card:active { 
 /* quick actions */
 .quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-width: 440px; margin: -4px auto 0; width: 100%; }
 .quick button { display: flex; flex-direction: column; align-items: center; gap: 7px; font-size: 12px; font-weight: 500; color: var(--label-2); padding: 4px 0; }
-.quick span { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); color: var(--label); box-shadow: var(--shadow-1); transition: transform 0.3s var(--spring), background 0.2s; }
+.quick span { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); color: var(--label); box-shadow: var(--shadow-1); transition: transform 0.3s var(--spring), background 0.2s var(--ease-out); }
 .quick button:active span { transform: scale(0.9); background: var(--fill-strong); }
 .quick svg { width: 22px; height: 22px; }
 
@@ -506,7 +507,7 @@ button.pay-card:hover { transform: translateY(-4px); } button.pay-card:active { 
 /* sheets: detail, keypad, grouped rows */
 .sheet { background: var(--bg); box-shadow: var(--shadow-2), var(--shadow-1); transition: transform 0.3s var(--ease); }
 .sheet-backdrop { background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-.sheet-backdrop.closing { animation: fade 0.24s ease reverse both; } .sheet-backdrop.closing .sheet { animation: sheet-down 0.24s var(--ease) both; }
+.sheet-backdrop.closing { animation: fade 0.24s var(--ease-out) reverse both; } .sheet-backdrop.closing .sheet { animation: sheet-down 0.24s var(--ease) both; }
 @keyframes sheet-down { to { transform: translateY(100%); } }
 @media (min-width: 700px) { @keyframes sheet-down { to { opacity: 0; transform: scale(0.97) translateY(10px); } } }
 .sheet-head { cursor: grab; touch-action: none; user-select: none; }
@@ -523,7 +524,7 @@ button.pay-card:hover { transform: translateY(-4px); } button.pay-card:active { 
 .keypad-amount { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 8px 0 2px; }
 .pill-select { border: 0; outline: none; appearance: none; -webkit-appearance: none; background: var(--fill); color: var(--label); border-radius: 980px; padding: 6px 14px; font-size: 13px; font-weight: 500; max-width: 190px; text-overflow: ellipsis; }
 .keypad { display: grid; grid-template-columns: repeat(3, 72px); gap: 12px 26px; justify-content: center; }
-.keypad button { width: 72px; height: 72px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow-1); font-size: 28px; font-weight: 400; display: grid; place-items: center; transition: background 0.15s, transform 0.2s var(--spring); }
+.keypad button { width: 72px; height: 72px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow-1); font-size: 28px; font-weight: 400; display: grid; place-items: center; transition: background 0.15s var(--ease-out), transform 0.2s var(--spring); }
 .keypad button:active { background: var(--fill-strong); transform: scale(0.93); }
 .keypad button:disabled { opacity: 0.25; } .keypad svg { width: 24px; height: 24px; }
 @media (max-height: 760px) { .keypad { grid-template-columns: repeat(3, 62px); gap: 8px 26px; } .keypad button { width: 62px; height: 62px; font-size: 24px; } .amount-xl { font-size: 44px; } }
@@ -597,7 +598,7 @@ button, a, [role="button"], .cell, .chip, .tab { touch-action: manipulation; }
 .action-sheet .btn { min-height: 52px; border-radius: 16px; font-size: 17px; }
 
 /* Toast with an Undo action. */
-.toast { display: flex; align-items: center; gap: 14px; padding: 8px 8px 8px 18px; animation: toast-in 0.42s cubic-bezier(0.2, 0.9, 0.3, 1.15) both; }
+.toast { display: flex; align-items: center; gap: 14px; padding: 8px 8px 8px 18px; animation: toast-in 0.42s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
 .toast:not(:has(.toast-action)) { padding: 11px 18px; }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 12px) scale(0.96); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
 .toast-action { font-weight: 700; color: inherit; padding: 6px 12px; border-radius: 14px; background: color-mix(in srgb, var(--bg) 22%, transparent); min-height: 32px; }
@@ -689,10 +690,10 @@ html[data-nav="back"]::view-transition-new(root) { animation: page-in-left 0.4s 
 @keyframes page-in-right { from { opacity: 0; transform: translateX(44px); } }
 @keyframes page-in-left { from { opacity: 0; transform: translateX(-44px); } }
 /* The active-tab pill glides between tabs (its position is morphed by the transition). */
-::view-transition-group(tab-pill), ::view-transition-group(side-pill) { animation-duration: 0.42s; animation-timing-function: cubic-bezier(0.2, 0.9, 0.25, 1.08); }
+::view-transition-group(tab-pill), ::view-transition-group(side-pill) { animation-duration: 0.42s; animation-timing-function: cubic-bezier(0.2, 0.9, 0.25, 1); }
 html[data-nav] .screen { animation: none; }
 /* Screens no longer animate a transform on mount (only opacity), so nothing traps fixed overlays. */
-.screen { animation: page-fade 0.32s ease both; }
+.screen { animation: page-fade 0.32s var(--ease-out) both; }
 @keyframes page-fade { from { opacity: 0; } }
 
 .tab { position: relative; background: none !important; }
@@ -723,11 +724,11 @@ html[data-nav] .screen { animation: none; }
 
 /* Progress dots (tour) */
 .ob-dots { display: flex; gap: 6px; }
-.ob-dots i { width: 7px; height: 7px; border-radius: 4px; background: var(--fill-strong); transition: width 0.4s cubic-bezier(0.2, 0.9, 0.25, 1.1), background 0.3s; }
+.ob-dots i { width: 7px; height: 7px; border-radius: 4px; background: var(--fill-strong); transition: width 0.4s cubic-bezier(0.2, 0.9, 0.25, 1), background 0.3s var(--ease-out); }
 .ob-dots i.done { background: var(--label-3); }
 .ob-dots i.on { width: 22px; background: var(--label); }
 .quick-pills { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 440px; width: 100%; margin: -6px auto 0; }
-.quick-pills button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 46px; border-radius: 23px; background: var(--surface); box-shadow: var(--shadow-1); font-weight: 600; font-size: 15px; transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s; }
+.quick-pills button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 46px; border-radius: 23px; background: var(--surface); box-shadow: var(--shadow-1); font-weight: 600; font-size: 15px; transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), background 0.2s var(--ease-out); }
 .quick-pills button:active { transform: scale(0.96); background: var(--fill-strong); }
 .quick-pills svg { width: 18px; height: 18px; }
 @media (min-width: 1100px) { .quick-pills { margin-left: 0; } }
@@ -747,9 +748,9 @@ html[data-nav] .screen { animation: none; }
 .tour-hero { font-size: clamp(40px, 11vw, 64px); line-height: 1.05; font-weight: 800; letter-spacing: -0.045em; }
 .tour-hero.small { font-size: clamp(32px, 8.5vw, 48px); }
 .tour-sub { font-size: 17px; line-height: 24px; color: rgba(255, 255, 255, 0.72); margin-top: 6px; }
-.tour-start { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 30px; opacity: 0; transform: translateY(16px) scale(0.96); pointer-events: none; transition: opacity 0.6s ease, transform 0.7s cubic-bezier(0.34, 1.4, 0.64, 1); }
+.tour-start { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 30px; opacity: 0; transform: translateY(16px) scale(0.96); pointer-events: none; transition: opacity 0.6s var(--ease-out), transform 0.7s cubic-bezier(0.25, 1, 0.5, 1); }
 .tour-start.in { opacity: 1; transform: none; pointer-events: auto; }
-.tour-veil .tour-start.in[style] { animation: start-in 0.7s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+.tour-veil .tour-start.in[style] { animation: start-in 0.7s cubic-bezier(0.25, 1, 0.5, 1) both; }
 @keyframes start-in { from { opacity: 0; transform: translateY(16px) scale(0.96); } }
 .tour-cta { min-height: 56px; min-width: 220px; padding: 0 32px; border-radius: 28px; font-size: 17px; font-weight: 600; color: #0b0b0d; background: #fff; box-shadow: 0 10px 40px rgba(255, 255, 255, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.4) inset; }
 .tour-cta:active { transform: scale(0.96); }
@@ -770,7 +771,7 @@ html[data-nav] .screen { animation: none; }
 @keyframes glow { 50% { box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.08), 0 0 36px 8px rgba(255, 255, 255, 0.28), inset 0 0 22px rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.7); } }
 .tour-spot.none::before { display: none; }
 
-.tour-panel { position: fixed; width: min(420px, calc(100vw - 32px)); padding: 18px 18px 16px; border-radius: 24px; background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(24px) saturate(160%); -webkit-backdrop-filter: blur(24px) saturate(160%); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(255, 255, 255, 0.14) inset; color: var(--label); outline: none; transition: top 0.6s cubic-bezier(0.2, 0.9, 0.2, 1), left 0.6s cubic-bezier(0.2, 0.9, 0.2, 1), opacity 0.3s; animation: panel-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.tour-panel { position: fixed; width: min(420px, calc(100vw - 32px)); padding: 18px 18px 16px; border-radius: 24px; background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(24px) saturate(160%); -webkit-backdrop-filter: blur(24px) saturate(160%); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(255, 255, 255, 0.14) inset; color: var(--label); outline: none; transition: top 0.6s cubic-bezier(0.2, 0.9, 0.2, 1), left 0.6s cubic-bezier(0.2, 0.9, 0.2, 1), opacity 0.3s var(--ease-out); animation: panel-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; }
 @keyframes panel-in { from { opacity: 0; transform: translateY(12px) scale(0.98); } }
 .tour-copy { margin: 6px 0 14px; min-height: 110px; }
 .tour-title { font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: -0.025em; }
@@ -814,7 +815,7 @@ h1.text-reveal { font-size: 32px; font-weight: 600; letter-spacing: -0.05em; }
 /* Tour: position and size are driven by Motion springs (Tour.tsx), so no CSS transitions on them. */
 .tour-spot { top: 0; left: 0; transition: none; will-change: transform; }
 .tour-spot.none { top: 0; left: 0; }
-.tour-panel { top: 0; left: 0; transition: opacity 0.3s; will-change: transform; animation: panel-fade 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.tour-panel { top: 0; left: 0; transition: opacity 0.3s var(--ease-out); will-change: transform; animation: panel-fade 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
 @keyframes panel-fade { from { opacity: 0; } }
 /* Each step's copy rises in place (the panel itself is moved by its spring). */
 .tour-copy { animation: copy-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
@@ -830,7 +831,7 @@ h1.text-reveal { font-size: 32px; font-weight: 600; letter-spacing: -0.05em; }
   /* the chart flows the full width after the sidebar, appearing at the right and fading at the far left */
   -webkit-mask-image: linear-gradient(90deg, transparent 260px, #000 440px, #000 calc(100% - 24px), transparent);
           mask-image: linear-gradient(90deg, transparent 260px, #000 440px, #000 calc(100% - 24px), transparent);
-  animation: ascii-in 1.6s ease both;
+  animation: ascii-in 1.6s var(--ease-out) both;
 }
 @keyframes ascii-in { from { opacity: 0; } }
 @media (max-width: 899px) {
@@ -929,7 +930,7 @@ h1.text-reveal { font-size: 32px; font-weight: 600; letter-spacing: -0.05em; }
 .setup-tiles.grid > .setup-other, .setup-tiles.grid > .setup-hint { grid-column: 1 / -1; }
 .setup-tile { display: flex; align-items: center; gap: 14px; min-height: 62px; padding: 12px 16px; border-radius: 16px; text-align: left; width: 100%;
   background: var(--surface); color: var(--label); box-shadow: 0 0 0 2px var(--separator), 0 4px 0 var(--separator);
-  transition: box-shadow 0.15s, background 0.15s, transform 0.1s; }
+  transition: box-shadow 0.15s var(--ease-out), background 0.15s var(--ease-out), transform 0.1s var(--ease-out); }
 .setup-tile:active { transform: translateY(3px); box-shadow: 0 0 0 2px var(--separator), 0 1px 0 var(--separator); }
 .setup-tile.on { background: var(--accent-soft); box-shadow: 0 0 0 2px var(--accent), 0 4px 0 color-mix(in srgb, var(--accent) 65%, #000); }
 .setup-tile.on:active { box-shadow: 0 0 0 2px var(--accent), 0 1px 0 color-mix(in srgb, var(--accent) 65%, #000); }
@@ -952,7 +953,7 @@ h1.text-reveal { font-size: 32px; font-weight: 600; letter-spacing: -0.05em; }
 
 /* Continue: a big pill with a pressable lip */
 .setup-cta { min-height: 54px; border-radius: 16px; font-size: 17px; font-weight: 750; letter-spacing: 0.01em; background: var(--accent); color: var(--on-accent);
-  box-shadow: 0 4px 0 color-mix(in srgb, var(--accent) 60%, #000); transition: transform 0.1s, box-shadow 0.1s, opacity 0.2s; }
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--accent) 60%, #000); transition: transform 0.1s var(--ease-out), box-shadow 0.1s var(--ease-out), opacity 0.2s var(--ease-out); }
 .setup-cta:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 0 0 color-mix(in srgb, var(--accent) 60%, #000); }
 .setup-cta:disabled { background: var(--fill-strong); color: var(--label-3); box-shadow: 0 4px 0 var(--fill); }
 
@@ -965,7 +966,7 @@ h1.text-reveal { font-size: 32px; font-weight: 600; letter-spacing: -0.05em; }
 .confetti { position: absolute; left: 50%; top: 22vh; width: 0; height: 0; pointer-events: none; z-index: 1; }
 .confetti i { position: absolute; display: block; }
 .accent-row { display: flex; flex-wrap: wrap; gap: 12px; }
-.accent-dot { width: 34px; height: 34px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); transition: transform 0.15s; }
+.accent-dot { width: 34px; height: 34px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); transition: transform 0.15s var(--ease-out); }
 .accent-dot:active { transform: scale(0.9); }
 .accent-dot[aria-checked="true"] { outline: 3px solid var(--accent); outline-offset: 3px; }
 
@@ -984,3 +985,60 @@ h1.text-reveal { font-size: 32px; font-weight: 600; letter-spacing: -0.05em; }
 .insight-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: linear-gradient(135deg, var(--g1), var(--g3)); transform: translateY(-1px); }
 .insight-more.warn { color: var(--warning); }
 .insight-more.warn .insight-dot { background: var(--warning); }
+
+
+/* ---------- Motion performance pass (apple-design: animate transform and opacity only) ----------
+   Measured with scripts/motion-check.cjs on an emulated iPhone at 4× CPU slowdown. */
+
+/* 1. Sheets dim what's behind them, as iOS sheets do, instead of blurring the whole screen every frame. */
+.sheet-backdrop { backdrop-filter: none; -webkit-backdrop-filter: none; }
+
+/* 2. Progressive edge blur in two layers per edge, not four: the same look at half the blur work. */
+.edge-blur > i:nth-child(1), .edge-blur > i:nth-child(3) { display: none; }
+
+/* 3. Tour: a solid panel (a moving frosted panel re-blurs every frame); the dim fades with opacity,
+      and the outline's glow breathes with opacity rather than by animating a blurred shadow. */
+.tour-panel { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.tour-spot { animation: tour-fade 0.45s var(--ease-out) both; transition: none; }
+@keyframes tour-fade { from { opacity: 0; } }
+.tour-spot::before { animation: none; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 0 26px 4px rgba(255, 255, 255, 0.34), inset 0 0 18px rgba(255, 255, 255, 0.12); }
+.tour-spot::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; box-shadow: 0 0 40px 10px rgba(255, 255, 255, 0.22); opacity: 0; animation: glow-breathe 2.4s var(--ease-in-out) infinite alternate; }
+.tour-spot.none::after { display: none; }
+@keyframes glow-breathe { to { opacity: 1; } }
+.tour-veil { animation: tour-fade 0.6s var(--ease-out) both; }
+
+/* 4. Loading placeholders: a highlight that slides across (transform), not a moving background. */
+.skeleton { position: relative; overflow: hidden; background: var(--fill); animation: none; }
+.skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--fill-strong) 80%, transparent), transparent);
+  animation: shimmer-x 1.4s var(--ease-in-out) infinite; }
+@keyframes shimmer-x { to { transform: translateX(100%); } }
+
+/* Setup's progress fill scales from the left (transform) rather than changing width. */
+.setup-progress i { width: 100%; transform-origin: left center; }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after, .tour-spot::after { animation: none; }
+}
+
+/* One blur layer per edge (mask-faded), not two: it was the largest cost during page changes and sheets. */
+.edge-blur > i:nth-child(2), .edge-blur > i:nth-child(4) { display: none; }
+.edge-blur > i:nth-child(3) { display: block; }
+.edge-blur.top > i:nth-child(3) { mask: linear-gradient(to bottom, #000 0%, transparent 85%); -webkit-mask: linear-gradient(to bottom, #000 0%, transparent 85%); }
+.edge-blur.bottom > i:nth-child(3) { mask: linear-gradient(to top, #000 0%, transparent 80%); -webkit-mask: linear-gradient(to top, #000 0%, transparent 80%); }
+
+/* The page's soft top glow on its own fixed layer: drawn once, instead of repainted whenever anything moves. */
+body { background: var(--bg); }
+body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: var(--glow) no-repeat; }
+
+/* Under an open sheet the page is dimmed: its edge blur stops working (invisible there), freeing every frame for the sheet. */
+html[data-sheet] .edge-blur > i { display: none; }
+
+/* Tour dim: panels and corners moved by transforms (see Dim in Tour.tsx); the outline no longer carries the dim. */
+.tour-spot { box-shadow: none; }
+.tour-dim { position: fixed; inset: 0; pointer-events: none; opacity: 0.66; animation: tour-fade 0.45s var(--ease-out) both; }
+.dim-panel { position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; background: #000; transform-origin: 0 0; }
+.dim-corner { position: absolute; left: 0; top: 0; }
+/* Placeholders are solid, so the background animation never shows through them. */
+.skeleton { background: color-mix(in srgb, var(--label) 7%, var(--bg)); }
+.skeleton::after { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--label) 7%, transparent), transparent); }

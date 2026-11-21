@@ -7,7 +7,7 @@
  * Progress is saved to the account (tour_step), so a reload resumes where the user left off.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { motion, useSpring, type MotionValue } from "motion/react";
+import { motion, useSpring, useTransform, type MotionValue } from "motion/react";
 import { api } from "../api.ts";
 import { useApp, type Tab } from "../ctx.ts";
 import { TextEffect } from "@/components/ui/text-effect";
@@ -27,7 +27,7 @@ const ALL_STEPS: Step[] = [
 const WELCOME_MS = 5000;
 /** The spotlight glides between targets on a spring (no overshoot to speak of), and keeps its velocity
  *  when the target changes mid-flight — e.g. while the page scrolls the next section into view. */
-const GLIDE = { visualDuration: 0.55, bounce: 0.12 };
+const GLIDE = { visualDuration: 0.5, bounce: 0 };
 /** Moves a group of springs to new values: the first placement (or Reduce Motion) jumps, later ones glide. */
 function drive(pairs: [MotionValue<number>, number][], jump: boolean) {
   for (const [mv, v] of pairs) jump ? mv.jump(v) : mv.set(v);
@@ -236,6 +236,7 @@ export function Tour({ mode, start, onClose }: { mode: "first" | "replay"; start
     <div className="tour-layer" role="dialog" aria-modal="true" aria-label={`Tour: ${s.title}`}>
       {/* Blocks the app underneath; the spotlight's shadow does the dimming. */}
       <div className="tour-catch" />
+      <Dim x={sx} y={sy} w={sw} h={sh} radius={rect?.radius ?? 20} />
       <motion.div className={`tour-spot ${rect ? "" : "none"}`} style={{ x: sx, y: sy, width: sw, height: sh, borderRadius: sr }} aria-hidden="true" />
       <motion.div className="tour-panel" ref={panel} tabIndex={-1} style={{ x: px, y: py, opacity: panelPos ? 1 : 0 }}>
         <div className="between">
@@ -257,6 +258,37 @@ export function Tour({ mode, start, onClose }: { mode: "first" | "replay"; start
           </div>
         </div>
       </motion.div>
+    </div>
+  );
+}
+
+/**
+ * The dimming around the spotlight, built from four panels and four rounded corner pieces that are only
+ * moved and stretched with transforms. A shadow-based dim (one huge box-shadow) has to repaint the whole
+ * screen on every frame the spotlight changes size; transforms are composited on the GPU with no repaint.
+ * The pieces sit in one group with the dim's opacity, so where they meet nothing doubles up.
+ */
+function Dim({ x, y, w, h, radius }: { x: MotionValue<number>; y: MotionValue<number>; w: MotionValue<number>; h: MotionValue<number>; radius: number }) {
+  const W = typeof window === "undefined" ? 1 : window.innerWidth, H = typeof window === "undefined" ? 1 : window.innerHeight;
+  const right = useTransform(() => x.get() + w.get()), bottom = useTransform(() => y.get() + h.get());
+  const top = { scaleY: useTransform(() => Math.max(0, y.get()) / H) };
+  const below = { y: bottom, scaleY: useTransform(() => Math.max(0, H - bottom.get()) / H) };
+  const left = { y, scaleY: useTransform(() => Math.max(0, h.get()) / H), scaleX: useTransform(() => Math.max(0, x.get()) / W) };
+  const rightSide = { x: right, y, scaleY: useTransform(() => Math.max(0, h.get()) / H), scaleX: useTransform(() => Math.max(0, W - right.get()) / W) };
+  const r = Math.max(0, radius);
+  const corner = (cx: MotionValue<number>, cy: MotionValue<number>, at: string) => (
+    <motion.i className="dim-corner" style={{ x: cx, y: cy, width: r, height: r, background: `radial-gradient(circle at ${at}, transparent ${r - 0.5}px, #000 ${r}px)` }} />
+  );
+  return (
+    <div className="tour-dim" aria-hidden="true">
+      <motion.i className="dim-panel" style={top} />
+      <motion.i className="dim-panel" style={below} />
+      <motion.i className="dim-panel" style={left} />
+      <motion.i className="dim-panel" style={rightSide} />
+      {corner(x, y, "100% 100%")}
+      {corner(useTransform(() => right.get() - r), y, "0 100%")}
+      {corner(x, useTransform(() => bottom.get() - r), "100% 0")}
+      {corner(useTransform(() => right.get() - r), useTransform(() => bottom.get() - r), "0 0")}
     </div>
   );
 }
