@@ -9,7 +9,7 @@
 A calm, Apple-inspired personal finance app. It reads your bank messages, keeps your budget honest,
 tracks scholarships to the yen and values your stocks at real prices. Every number on screen comes from your own records.
 
-[**Open Folio →**](https://folio-ivory-six.vercel.app)
+[**Open Folio**](https://folio-ivory-six.vercel.app)
 
 ![React](https://img.shields.io/badge/React_18-20232a?style=flat-square&logo=react&logoColor=61dafb)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white)
@@ -27,8 +27,29 @@ tracks scholarships to the yen and values your stocks at real prices. Every numb
 
 <br />
 
+## About
+
+Folio started as a personal tool: a student in Japan paying with an Indian forex card and a credit card,
+living on a monthly scholarship, and holding a few Indian stocks. No single app understood all of that,
+and none could read the bank's text messages, so everything was tracked by hand.
+
+Folio brings it into one place. Bank messages become categorised transactions. The budget shows how fast
+the month is going, scholarships are tracked as expected and received, and the portfolio is valued at
+real market prices. Two things guide every screen:
+
+- **Only real numbers.** Balances come from the bank's own messages or your entries, prices from a market-data
+  provider, and anything estimated is labelled as an estimate. Nothing is filled in to look complete.
+- **The care of a native app.** The layout, motion and accessibility follow Apple's Human Interface Guidelines,
+  so it feels at home on an iPhone while running in any browser.
+
+It is a web app (React and an Express API on Vercel, with Supabase Postgres) that installs to the Home Screen,
+sends push notifications and works on phone and desktop.
+
+<br />
+
 ## Contents
 
+- [About](#about)
 - [Highlights](#highlights)
 - [A tour of the app](#a-tour-of-the-app)
 - [Design](#design)
@@ -45,15 +66,15 @@ tracks scholarships to the yen and values your stocks at real prices. Every numb
 
 | | |
 |---|---|
-| 💬 **Reads bank messages** | Paste or forward bank SMS and Folio pulls out the amount, merchant, card, date and balance, even from cut-off or misspelled names like `SEVEN-ELEVE` or `MOBILE SUIC`. |
-| 🏷️ **Sorts itself** | About 200 Japanese and Indian merchants are recognised out of the box. Correct one category and Folio remembers it. |
-| 🎯 **Budgets that keep up** | A monthly budget with pace, a projection labelled as an estimate, per-category limits and alerts before you go over. |
-| 🎓 **Scholarships, separately** | Expected payments are a schedule, not money. Only what's actually received is counted, and scholarships never mix with other income. |
-| 📈 **A real portfolio** | Holdings valued at market prices (Alpha Vantage), daily moves, returns, movers, news and earnings dates, plus your own plan for each stock. |
-| 💡 **Insights each visit** | Two lines under the greeting: what changed since you last looked, and one insight picked for the goals you chose. |
-| 🔔 **Push notifications** | Budget, scholarship, card-due, spending and weekly recaps, worded like a friend and quiet overnight. They work on iPhone from the Home Screen too. |
-| 🗣️ **Ask Folio** | Ask about your money in plain language. Answers are worked out from your records and labelled *Verified*, *Estimate* or *AI-generated*. |
-| 🎨 **Make it yours** | A Duolingo-style setup, eight accent colours that also restyle the app icon, light and dark themes, and your own cards and market watch. |
+| **Reads bank messages** | Paste or forward bank SMS and Folio pulls out the amount, merchant, card, date and balance, even from cut-off or misspelled names like `SEVEN-ELEVE` or `MOBILE SUIC`. |
+| **Sorts itself** | About 200 Japanese and Indian merchants are recognised out of the box. Correct one category and Folio remembers it. |
+| **Budgets that keep up** | A monthly budget with pace, a projection labelled as an estimate, per-category limits and alerts before you go over. |
+| **Scholarships, separately** | Expected payments are a schedule, not money. Only what's actually received is counted, and scholarships never mix with other income. |
+| **A real portfolio** | Holdings valued at market prices (Alpha Vantage), daily moves, returns, movers, news and earnings dates, plus your own plan for each stock. |
+| **Insights each visit** | Two lines under the greeting: what changed since you last looked, and one insight picked for the goals you chose. |
+| **Push notifications** | Budget, scholarship, card-due, spending and weekly recaps, worded like a friend and quiet overnight. They work on iPhone from the Home Screen too. |
+| **Ask Folio** | Ask about your money in plain language. Answers are worked out from your records and labelled *Verified*, *Estimate* or *AI-generated*. |
+| **Make it yours** | A Duolingo-style setup, eight accent colours that also restyle the app icon, light and dark themes, and your own cards and market watch. |
 
 <br />
 
@@ -118,7 +139,7 @@ Folio is designed with Apple's Human Interface Guidelines and the motion princip
 |---|---|
 | Launch | The logo's stars trade places while data loads, then the screen fades away and Home cascades in |
 | Page change | The new page slides in from the side you're heading to, and the tab pill glides across |
-| Light ↔ dark | The new theme spreads as a circle from the button you pressed |
+| Light and dark | The new theme spreads as a circle from the button you pressed |
 | Sheets | Rise on a spring and track your drag 1:1. Letting go keeps your speed and decides by where it would land |
 | Cards | Tap the card behind and it springs forward while the others re-stack |
 | Numbers | Rise in character by character the first time, then count between values |
@@ -133,11 +154,11 @@ Folio is designed with Apple's Human Interface Guidelines and the motion princip
 
 ```mermaid
 flowchart LR
-  subgraph Phone["📱 Phone / browser"]
+  subgraph Phone["Phone / browser"]
     UI["React app<br/>(Vite, Motion)"]
     SW["Service worker<br/>(push notifications)"]
   end
-  subgraph Vercel["▲ Vercel"]
+  subgraph Vercel["Vercel"]
     API["Express API<br/>api/index.ts"]
     CRON["Daily & weekly<br/>scheduled runs"]
   end
@@ -205,8 +226,8 @@ environment variables below and deploy.
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `DATABASE_URL` | ✅ | Supabase transaction-pooler connection string |
-| `FOLIO_SECRET` | ✅ | Long random string (`openssl rand -hex 32`). Encrypts saved keys; keep it stable |
+| `DATABASE_URL` | Yes | Supabase transaction-pooler connection string |
+| `FOLIO_SECRET` | Yes | Long random string (`openssl rand -hex 32`). Encrypts saved keys; keep it stable |
 | `DATABASE_CA` | | The database's SSL certificate, to verify the server |
 | `CRON_SECRET` | | Protects the scheduled notification runs |
 
@@ -226,7 +247,7 @@ server/
   auth.ts                 Accounts, sessions, rate limiting
   routes/                 core (transactions, accounts, budgets, push), income, portfolio
   services/
-    ingest.ts             Bank messages → transactions, duplicates, learning
+    ingest.ts             Bank messages to transactions, duplicates, learning
     insights.ts           The two lines under Home's greeting
     notify.ts             Push notifications: wording, quiet hours, scheduled runs
     summary.ts            Spending, budgets, income totals
