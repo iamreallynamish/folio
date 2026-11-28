@@ -42,8 +42,8 @@ test("importing the four sample messages", async () => {
   assert.equal(r.imported, 4);
 
   const { accounts } = (await A("GET", "/accounts")).body;
-  const icici = accounts.find((a: any) => a.last4 === "0817"), axis = accounts.find((a: any) => a.last4 === "7117");
-  assert.equal(icici.balanceMinor, 63756);
+  const icici = accounts.find((a: any) => a.last4 === "4821"), axis = accounts.find((a: any) => a.last4 === "3390");
+  assert.equal(icici.balanceMinor, 42756);
   assert.equal(icici.currency, "JPY");
   assert.equal(icici.balanceSource, "sms");
   assert.equal(axis.balanceMinor, null, "Axis balance stays unknown");
@@ -59,10 +59,10 @@ test("duplicates are not recorded twice", async () => {
   assert.equal(again.imported, 0);
   assert.equal(again.duplicates, 4);
   // Same purchase reported with different wording (no time) is still a duplicate.
-  const reworded = (await A("POST", "/sms/import", { text: "JPY 421.00 spent on Axis Bank Card XX7117 at FAMILYMART on 04-Oct-2026." })).body;
+  const reworded = (await A("POST", "/sms/import", { text: "JPY 421.00 spent on Axis Bank Card XX3390 at FAMILYMART on 04-Oct-2026." })).body;
   assert.equal(reworded.duplicates, 1);
   // Same merchant and amount at a different time on the same day is a separate purchase.
-  const second = (await A("POST", "/sms/import", { text: "JPY 421 Axis Bank Card no. XX7117 04-10-26 21:15:00 IST FAMILYMART" })).body;
+  const second = (await A("POST", "/sms/import", { text: "JPY 421 Axis Bank Card no. XX3390 04-10-26 21:15:00 IST FAMILYMART" })).body;
   assert.equal(second.imported, 1);
   const manual = await A("POST", "/transactions", { type: "expense", amount: "500", currency: "JPY", date: "2026-10-03", merchant: "Uber", accountId: 2 });
   assert.equal(manual.status, 409);
@@ -80,24 +80,24 @@ test("Suica journeys count once, as transport", async () => {
 });
 
 test("older balance does not overwrite a newer one; balance notices update", async () => {
-  await A("POST", "/sms/import", { text: "JPY 100.00 has been made using your ICICI Bank Forex Prepaid Card XX0817 at LAWSON on 01-Oct-2026. Current available balance on your Forex Prepaid Card is JPY 99,999.00." });
-  let icici = (await A("GET", "/accounts")).body.accounts.find((a: any) => a.last4 === "0817");
-  assert.equal(icici.balanceMinor, 63756);
-  const r = (await A("POST", "/sms/import", { text: "Available balance on your ICICI Bank Forex Prepaid Card XX0817 is JPY 60,000.00 as on 06-Oct-2026." })).body;
+  await A("POST", "/sms/import", { text: "JPY 100.00 has been made using your ICICI Bank Forex Prepaid Card XX4821 at LAWSON on 01-Oct-2026. Current available balance on your Forex Prepaid Card is JPY 99,999.00." });
+  let icici = (await A("GET", "/accounts")).body.accounts.find((a: any) => a.last4 === "4821");
+  assert.equal(icici.balanceMinor, 42756);
+  const r = (await A("POST", "/sms/import", { text: "Available balance on your ICICI Bank Forex Prepaid Card XX4821 is JPY 60,000.00 as on 06-Oct-2026." })).body;
   assert.equal(r.imported, 0);
   assert.equal(r.balances, 1);
-  icici = (await A("GET", "/accounts")).body.accounts.find((a: any) => a.last4 === "0817");
+  icici = (await A("GET", "/accounts")).body.accounts.find((a: any) => a.last4 === "4821");
   assert.equal(icici.balanceMinor, 60000);
 });
 
 test("category corrections are learned", async () => {
-  await A("POST", "/sms/import", { text: "JPY 800 Axis Bank Card no. XX7117 07-10-26 12:00:00 IST TANAKA SHOTEN" });
+  await A("POST", "/sms/import", { text: "JPY 800 Axis Bank Card no. XX3390 07-10-26 12:00:00 IST TANAKA SHOTEN" });
   const txns = (await A("GET", "/transactions?q=tanaka")).body.transactions;
   assert.equal(txns[0].categoryName, "Uncategorised");
   assert.equal(txns[0].needsReview, true);
   const food = (await A("GET", "/categories")).body.categories.find((c: any) => c.key === "groceries");
   await A("PATCH", `/transactions/${txns[0].id}`, { categoryId: food.id });
-  await A("POST", "/sms/import", { text: "JPY 650 Axis Bank Card no. XX7117 09-10-26 13:00:00 IST TANAKA SHOTEN" });
+  await A("POST", "/sms/import", { text: "JPY 650 Axis Bank Card no. XX3390 09-10-26 13:00:00 IST TANAKA SHOTEN" });
   const after = (await A("GET", "/transactions?q=tanaka")).body.transactions;
   assert.deepEqual(after.map((t: any) => [t.categoryName, t.needsReview]), [["Groceries / Convenience Store", false], ["Groceries / Convenience Store", false]]);
 });
@@ -112,8 +112,8 @@ test("since last visit resets after review", async () => {
 });
 
 test("refunds reduce spending; other currencies need a rate", async () => {
-  await A("POST", "/sms/import", { text: "Refund of JPY 421 has been credited to your Axis Bank Card XX7117 from FAMILYMART on 10-10-26." });
-  await A("POST", "/sms/import", { text: "INR 1,000.00 spent on Axis Bank Card XX7117 at AMAZON on 11-Oct-2026." });
+  await A("POST", "/sms/import", { text: "Refund of JPY 421 has been credited to your Axis Bank Card XX3390 from FAMILYMART on 10-10-26." });
+  await A("POST", "/sms/import", { text: "INR 1,000.00 spent on Axis Bank Card XX3390 at AMAZON on 11-Oct-2026." });
   let s = (await A("GET", "/budget?month=2026-10")).body.summary;
   const base = 4779 + 500 + 421 + 421 + 210 + 100 + 800 + 650 - 421;
   assert.equal(s.spent, base);
@@ -173,7 +173,7 @@ test("users cannot see or change each other's data; CSRF header required", async
 
 test("ingest endpoint with personal token", async () => {
   const { token } = (await A("POST", "/me/ingest-token")).body;
-  const res = await fetch(base + "/ingest/sms", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ text: "JPY 300 Axis Bank Card no. XX7117 12-10-26 09:00:00 IST STARBUCKS" }) });
+  const res = await fetch(base + "/ingest/sms", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ text: "JPY 300 Axis Bank Card no. XX3390 12-10-26 09:00:00 IST STARBUCKS" }) });
   assert.deepEqual(await res.json(), { imported: 1, duplicates: 0, ignored: 0, balances: 0 });
   const bad = await fetch(base + "/ingest/sms", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer nope" }, body: "{}" });
   assert.equal(bad.status, 401);
@@ -198,8 +198,8 @@ test("first-run tour progress is saved and finishing marks the account onboarded
 const D = client(); // shared by the tests below (sign-ups are rate-limited)
 test("same-day identical purchases with different balances are both kept; re-pasting adds nothing", async () => {
   assert.equal((await D("POST", "/auth/register", { email: "same-day@example.com", name: "S", password: "correct horse battery" })).status, 201);
-  const a = "JPY 302.00 has been made using your ICICI Bank Forex Prepaid Card XX0817 at SEVEN-ELEVEN on 27-Oct-2026 . Current available balance on your Forex Prepaid Card is JPY 85,889.00 0.";
-  const b = "JPY 302.00 has been made using your ICICI Bank Forex Prepaid Card XX0817 at SEVEN-ELEVEN on 27-Oct-2026 . Current available balance on your Forex Prepaid Card is JPY 85,587.00 0.";
+  const a = "JPY 302.00 has been made using your ICICI Bank Forex Prepaid Card XX4821 at SEVEN-ELEVEN on 27-Oct-2026 . Current available balance on your Forex Prepaid Card is JPY 64,889.00 0.";
+  const b = "JPY 302.00 has been made using your ICICI Bank Forex Prepaid Card XX4821 at SEVEN-ELEVEN on 27-Oct-2026 . Current available balance on your Forex Prepaid Card is JPY 64,587.00 0.";
   const first = (await D("POST", "/sms/import", { text: `${a}\n\n${b}` })).body;
   assert.equal(first.imported, 2, "two messages, two balances: two purchases");
   const again = (await D("POST", "/sms/import", { text: `${a}\n\n${b}` })).body;
@@ -208,7 +208,7 @@ test("same-day identical purchases with different balances are both kept; re-pas
 });
 
 test("an Axis 'using … Credit Card' alert pasted with its line break imports as one purchase", async () => {
-  const r = (await D("POST", "/sms/import", { text: "JPY 339 using Axis Bank Credit Card no. XX7117 on 31-10-26 21:02:52 IST at \nSEVEN-ELEVE." })).body;
+  const r = (await D("POST", "/sms/import", { text: "JPY 339 using Axis Bank Credit Card no. XX3390 on 31-10-26 21:02:52 IST at \nSEVEN-ELEVE." })).body;
   assert.equal(r.imported, 1);
   const t = (await D("GET", "/transactions")).body.transactions[0];
   assert.equal(t.merchant, "7-Eleven");
@@ -221,7 +221,7 @@ test("earlier imports left uncategorised are re-read on the next import", async 
   const t = (await D("GET", "/transactions")).body.transactions.find((x: any) => x.merchant === "7-Eleven" && x.amountMinor === 302);
   const unc = await get<{ id: number }>("SELECT id FROM categories WHERE user_id = (SELECT user_id FROM transactions WHERE id = ?) AND key = 'uncategorised'", t.id);
   await run("UPDATE transactions SET merchant = 'Seven', merchant_key = 'SEVEN', category_id = ?, needs_review = 1 WHERE id = ?", unc!.id, t.id);
-  const r = (await D("POST", "/sms/import", { text: "JPY 402.00 has been made using your ICICI Bank Forex Prepaid Card XX0817 at FAMILYMART on 28-Oct-2026 . Current available balance on your Forex Prepaid Card is JPY 79,734.00 0." })).body;
+  const r = (await D("POST", "/sms/import", { text: "JPY 402.00 has been made using your ICICI Bank Forex Prepaid Card XX4821 at FAMILYMART on 28-Oct-2026 . Current available balance on your Forex Prepaid Card is JPY 58,734.00 0." })).body;
   assert.equal(r.imported, 1);
   assert.equal(r.recategorised, 1);
   const fixed = (await D("GET", "/transactions")).body.transactions.find((x: any) => x.id === t.id);
@@ -233,7 +233,7 @@ test("earlier imports left uncategorised are re-read on the next import", async 
 test("cash withdrawals: chosen by hand or converted, never counted as spending, never learned", async () => {
   const spent = async () => (await D("GET", "/budget?month=2026-11")).body.summary.spent;
   const before = await spent();
-  const axis = (await D("GET", "/accounts")).body.accounts.find((a: any) => a.last4 === "7117");
+  const axis = (await D("GET", "/accounts")).body.accounts.find((a: any) => a.last4 === "3390");
   // Chosen by hand
   const w = await D("POST", "/transactions", { cashWithdrawal: true, amount: "10000", currency: "JPY", date: "2026-11-03", accountId: axis.id });
   assert.equal(w.status, 201);
@@ -253,7 +253,7 @@ test("cash withdrawals: chosen by hand or converted, never counted as spending, 
   const next = await D("POST", "/transactions", { type: "expense", amount: "300", currency: "JPY", date: "2026-11-05", merchant: "7-Eleven", accountId: axis.id });
   assert.match(next.body.transaction.categoryName, /^Groceries/);
   // An imported ATM message lands in the same place.
-  const imp = (await D("POST", "/sms/import", { text: "JPY 20000 using Axis Bank Credit Card no. XX7117 on 06-11-26 11:00:00 IST at SEVEN BANK ATM." })).body;
+  const imp = (await D("POST", "/sms/import", { text: "JPY 20000 using Axis Bank Credit Card no. XX3390 on 06-11-26 11:00:00 IST at SEVEN BANK ATM." })).body;
   assert.equal(imp.items[0].category, "Cash withdrawal");
   assert.equal(await spent(), before + 300);
 });
@@ -266,7 +266,7 @@ test("a purchase typed in at an ATM is recorded as a withdrawal", async () => {
 
 test("card line settings: billing cycle days and last top-up (set, or from money added)", async () => {
   const accts = (await D("GET", "/accounts")).body.accounts;
-  const axis = accts.find((a: any) => a.last4 === "7117"), icici = accts.find((a: any) => a.last4 === "0817");
+  const axis = accts.find((a: any) => a.last4 === "3390"), icici = accts.find((a: any) => a.last4 === "4821");
   const a = (await D("PATCH", `/accounts/${axis.id}`, { cardLine: "cycle", statementDay: 15, dueDay: 5 })).body.account;
   assert.deepEqual([a.cardLine, a.statementDay, a.dueDay], ["cycle", 15, 5]);
   assert.equal((await D("PATCH", `/accounts/${axis.id}`, { statementDay: 32 })).status, 400);
@@ -392,8 +392,8 @@ test("notification wording: spending, top-ups, money in, low balance, quiet hour
     const u = await get<any>("SELECT * FROM users WHERE email = 'same-day@example.com'");
     setPushClock(() => new Date("2026-11-21T03:00:00Z")); // noon in Tokyo
     // One purchase: "Spent ¥494 at 7-Eleven", the card on the second line.
-    await afterTransactions(u, [{ merchant: "7-Eleven", merchantKey: "7 ELEVEN", amountMinor: 494, currency: "JPY", type: "expense", bank: "Axis Bank", last4: "7117", category: "Groceries / Convenience Store" }], true);
-    assert.deepEqual([sent.at(-1).title, sent.at(-1).body], ["Spent ¥494 at 7-Eleven", "Axis ••7117"]);
+    await afterTransactions(u, [{ merchant: "7-Eleven", merchantKey: "7 ELEVEN", amountMinor: 494, currency: "JPY", type: "expense", bank: "Axis Bank", last4: "3390", category: "Groceries / Convenience Store" }], true);
+    assert.deepEqual([sent.at(-1).title, sent.at(-1).body], ["Spent ¥494 at 7-Eleven", "Axis ••3390"]);
     // A place never seen before.
     await afterTransactions(u, [{ merchant: "Kaldi Coffee Farm", merchantKey: "KALDI NEVER SEEN", amountMinor: 880, currency: "JPY", type: "expense", category: "Groceries / Convenience Store" }], true);
     assert.equal(sent.at(-1).body, "First time there. I put it under Groceries.");

@@ -115,7 +115,7 @@ const DEBIT_RE = /\b(debited|spent|purchase|paid|payment of|withdrawn|withdrawal
 const CREDIT_RE = /\b(credited|received|deposited|refund(ed)?|reversal|reversed|cashback (of|credited))\b/i;
 const REFUND_RE = /\b(refund(ed)?|reversal|reversed|chargeback)\b/i;
 const BALANCE_RE = /\b(avl\.?|avbl\.?|available|current|closing|total|net)?\s*\bbal(ance)?\b/i;
-/** Axis-style compact alert: "JPY 500 Axis Bank Card no. XX7117 03-10-26 17:03:00 IST UBER *TRIP". */
+/** Axis-style compact alert: "JPY 500 Axis Bank Card no. XX3390 03-10-26 17:03:00 IST UBER *TRIP". */
 const COMPACT_RE = /card\s*no\.?\s*[Xx*]*\d{4}\s+\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:[A-Z]{3})?\s+(.+)$/i;
 
 function findLast4(text: string): string | undefined {
@@ -286,8 +286,8 @@ export function messagesFromFile(name: string, content: string): { text: string;
 }
 
 export const SAMPLE_MESSAGES = [
-  "JPY 4,779.00 has been made using your ICICI Bank Forex Prepaid Card XX0817 at NITORI on 03-Oct-2026. Current available balance on your Forex Prepaid Card is JPY 63,756.00.",
-  "JPY 500 Axis Bank Card no. XX7117 03-10-26 17:03:00 IST UBER *TRIP",
-  "JPY 421 Axis Bank Card no. XX7117 04-10-26 17:02:40 IST FAMILYMART",
-  "JPY 4000 Axis Bank Card no. XX7117 05-10-26 20:06:37 IST MOBILE SUICA",
+  "JPY 4,779.00 has been made using your ICICI Bank Forex Prepaid Card XX4821 at NITORI on 03-Oct-2026. Current available balance on your Forex Prepaid Card is JPY 42,756.00.",
+  "JPY 500 Axis Bank Card no. XX3390 03-10-26 17:03:00 IST UBER *TRIP",
+  "JPY 421 Axis Bank Card no. XX3390 04-10-26 17:02:40 IST FAMILYMART",
+  "JPY 4000 Axis Bank Card no. XX3390 05-10-26 20:06:37 IST MOBILE SUICA",
 ];

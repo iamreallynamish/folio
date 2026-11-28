@@ -15,11 +15,11 @@ test("ICICI forex card at NITORI", () => {
   assert.equal(p.time, undefined);
   assert.equal(p.bank, "ICICI Bank");
   assert.equal(p.instrument, "Forex Prepaid Card");
-  assert.equal(p.last4, "0817");
+  assert.equal(p.last4, "4821");
   assert.equal(p.merchant?.name, "Nitori");
   assert.equal(p.merchant?.category, "shopping");
   assert.equal(p.merchant?.subcategory, "Home & Furniture");
-  assert.equal(p.balanceMinor, 63756);
+  assert.equal(p.balanceMinor, 42756);
   assert.equal(p.balanceCurrency, "JPY");
   assert.equal(p.needsReview, false);
 });
@@ -34,7 +34,7 @@ test("Axis compact alert: Uber trip", () => {
   assert.equal(p.tz, "IST");
   assert.equal(p.bank, "Axis Bank");
   assert.equal(p.instrument, "Card");
-  assert.equal(p.last4, "7117");
+  assert.equal(p.last4, "3390");
   assert.equal(p.merchant?.name, "Uber");
   assert.equal(p.merchant?.category, "transport");
   assert.equal(p.balanceMinor, undefined, "no balance stated, none invented");
@@ -73,19 +73,19 @@ test("merchant dictionary examples", () => {
 });
 
 test("OTPs, promotions, failures and reminders are ignored", () => {
-  assert.equal(parseSms("123456 is your OTP for txn of INR 4,500.00 at AMAZON on card XX7117. Do not share it with anyone.").class, "otp");
+  assert.equal(parseSms("123456 is your OTP for txn of INR 4,500.00 at AMAZON on card XX3390. Do not share it with anyone.").class, "otp");
   assert.equal(parseSms("Get up to 20% cashback up to Rs.500 on your Axis Bank Card! Offer valid till 31-Oct. T&C apply https://axis.bk/x").class, "promo");
-  assert.equal(parseSms("Your transaction of JPY 900 on Axis Bank Card no. XX7117 at LAWSON was declined due to insufficient funds.").class, "failed");
-  assert.equal(parseSms("Payment of INR 2,300.00 for your ICICI Bank Credit Card XX0817 is due on 15-Oct-2026.").class, "reminder");
+  assert.equal(parseSms("Your transaction of JPY 900 on Axis Bank Card no. XX3390 at LAWSON was declined due to insufficient funds.").class, "failed");
+  assert.equal(parseSms("Payment of INR 2,300.00 for your ICICI Bank Credit Card XX4821 is due on 15-Oct-2026.").class, "reminder");
   assert.equal(parseSms("Dear customer, your KYC needs updating.").class, "unknown");
 });
 
 test("balance-only notification creates no transaction but carries the balance", () => {
-  const p = parseSms("Available balance on your ICICI Bank Forex Prepaid Card XX0817 is JPY 60,000.00 as on 06-Oct-2026.");
+  const p = parseSms("Available balance on your ICICI Bank Forex Prepaid Card XX4821 is JPY 60,000.00 as on 06-Oct-2026.");
   assert.equal(p.class, "balance");
   assert.equal(p.amountMinor, undefined);
   assert.equal(p.balanceMinor, 60000);
-  assert.equal(p.last4, "0817");
+  assert.equal(p.last4, "4821");
 });
 
 test("refunds and credits", () => {
@@ -108,7 +108,7 @@ test("UPI debit that also mentions 'credited to'", () => {
 });
 
 test("message without a date uses the received date and is flagged", () => {
-  const p = parseSms("INR 120.00 spent on Axis Bank Card XX7117 at STARBUCKS.", "2026-10-09");
+  const p = parseSms("INR 120.00 spent on Axis Bank Card XX3390 at STARBUCKS.", "2026-10-09");
   assert.equal(p.date, "2026-10-09");
   assert.equal(p.dateInferred, true);
   assert.equal(p.needsReview, true);
@@ -124,14 +124,14 @@ test("money maths", () => {
   assert.equal(toMinor("12.5", "INR"), 1250);
   assert.equal(toMinor("0.005", "USD"), 1);
   assert.equal(toMinor("abc", "USD"), null);
-  assert.equal(formatMoney(63756, "JPY"), "¥63,756");
+  assert.equal(formatMoney(42756, "JPY"), "¥42,756");
   assert.equal(formatMoney(-49900, "INR"), "−₹499.00");
   assert.equal(convertMinor(10000, "INR", "JPY", 1.8), 180);
 });
 
-// The user's own October 2026 messages, exactly as pasted (line breaks, trailing "0.", cut-off names).
+// Sample October 2026 messages in the banks' real formats (line breaks, trailing "0.", cut-off names).
 test("real Axis and ICICI alerts: every message is a transaction with the right merchant", () => {
-  const msgs = splitMessages(readFileSync(new URL("./fixtures-user-oct26.txt", import.meta.url), "utf8"));
+  const msgs = splitMessages(readFileSync(new URL("./fixtures-sample-messages.txt", import.meta.url), "utf8"));
   assert.equal(msgs.length, 20);
   const got = msgs.map((m) => parseSms(m));
   for (const p of got) assert.equal(p.class, "transaction", p.raw);
@@ -140,26 +140,26 @@ test("real Axis and ICICI alerts: every message is a transaction with the right 
     "Don Quijote", "Mobile Suica", "7-Eleven", "7-Eleven", null, "Mobile Suica", "7-Eleven", "MaxValu", "7-Eleven", "7-Eleven",
     "FamilyMart", "7-Eleven", "7-Eleven", "7-Eleven", "Ito-Yokado", "Uniqlo", "Ito-Yokado", "McDonald's", "Mobile Suica", "7-Eleven",
   ]);
-  // Axis "using … Credit Card no. XX7117 on 24-10-26 21:48:36 IST at SEVEN-ELEVE."
+  // Axis "using … Credit Card no. XX3390 on 24-10-26 21:48:36 IST at SEVEN-ELEVE."
   const axis = got[2];
   assert.equal(axis.amountMinor, 494);
   assert.equal(axis.date, "2026-10-24");
   assert.equal(axis.time, "21:48:36");
   assert.equal(axis.bank, "Axis Bank");
   assert.equal(axis.instrument, "Credit Card");
-  assert.equal(axis.last4, "7117");
+  assert.equal(axis.last4, "3390");
   assert.equal(axis.merchant?.category, "groceries");
   assert.equal(axis.merchant?.match, "truncated");
   assert.equal(axis.balanceMinor, undefined, "Axis states no balance; none invented");
   // Suica top-ups are money moved into a wallet, not spending.
   assert.equal(got[1].type, "transfer");
   assert.equal(got[1].merchant?.wallet, "Mobile Suica");
-  // ICICI "transacted at POS … Bal JPY 86,191.00": a purchase with no shop named — kept, flagged for review.
+  // ICICI "transacted at POS … Bal JPY 65,191.00": a purchase with no shop named — kept, flagged for review.
   assert.equal(got[4].amountMinor, 226);
-  assert.equal(got[4].balanceMinor, 86191);
+  assert.equal(got[4].balanceMinor, 65191);
   assert.equal(got[4].needsReview, true);
   // ICICI balance with a stray trailing "0." is read correctly.
-  assert.equal(got[6].balanceMinor, 85889);
+  assert.equal(got[6].balanceMinor, 64889);
 });
 
 test("misspelled and cut-off merchant names are recognised; lookalikes are not", () => {
@@ -176,10 +176,10 @@ test("misspelled and cut-off merchant names are recognised; lookalikes are not",
 
 test("dotted merchant names: AMAZON.CO.JP and WWW.AMAZON.CO.JP are Amazon", () => {
   for (const m of [
-    "JPY 2480 using Axis Bank Credit Card no. XX7117 on 02-11-26 10:15:00 IST at WWW.AMAZON.CO.JP",
-    "JPY 2,480 using Axis Bank Credit Card no. XX7117 on 02-11-26 10:15:00 IST at \nAMAZON.CO.JP.",
-    "JPY 1,299.00 has been made using your ICICI Bank Forex Prepaid Card XX0817 at AMAZON.CO.JP on 02-Nov-2026 . Current available balance on your Forex Prepaid Card is JPY 77,087.00 0.",
-    "JPY 899 Axis Bank Card no. XX7117 02-11-26 10:15:00 IST AMAZON.CO.JP",
+    "JPY 2480 using Axis Bank Credit Card no. XX3390 on 02-11-26 10:15:00 IST at WWW.AMAZON.CO.JP",
+    "JPY 2,480 using Axis Bank Credit Card no. XX3390 on 02-11-26 10:15:00 IST at \nAMAZON.CO.JP.",
+    "JPY 1,299.00 has been made using your ICICI Bank Forex Prepaid Card XX4821 at AMAZON.CO.JP on 02-Nov-2026 . Current available balance on your Forex Prepaid Card is JPY 77,087.00 0.",
+    "JPY 899 Axis Bank Card no. XX3390 02-11-26 10:15:00 IST AMAZON.CO.JP",
   ]) {
     const p = parseSms(m);
     assert.equal(p.merchant?.name, "Amazon", m);
@@ -189,9 +189,9 @@ test("dotted merchant names: AMAZON.CO.JP and WWW.AMAZON.CO.JP are Amazon", () =
 
 test("ATM withdrawals are cash moved to the Cash wallet, not spending", () => {
   for (const m of [
-    "JPY 10,000 withdrawn at ATM using ICICI Bank Forex Prepaid Card XX0817 on 03-Nov-2026. Bal JPY 67,087.00",
-    "JPY 10000 using Axis Bank Credit Card no. XX7117 on 03-11-26 11:00:00 IST at SEVEN BANK ATM.",
-    "JPY 10,000.00 has been made using your ICICI Bank Forex Prepaid Card XX0817 at ATM on 03-Nov-2026 . Current available balance on your Forex Prepaid Card is JPY 67,087.00",
+    "JPY 10,000 withdrawn at ATM using ICICI Bank Forex Prepaid Card XX4821 on 03-Nov-2026. Bal JPY 67,087.00",
+    "JPY 10000 using Axis Bank Credit Card no. XX3390 on 03-11-26 11:00:00 IST at SEVEN BANK ATM.",
+    "JPY 10,000.00 has been made using your ICICI Bank Forex Prepaid Card XX4821 at ATM on 03-Nov-2026 . Current available balance on your Forex Prepaid Card is JPY 67,087.00",
   ]) {
     const p = parseSms(m);
     assert.equal(p.type, "transfer", m);

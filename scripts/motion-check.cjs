@@ -77,7 +77,7 @@ function stats(name, r) {
   if (await p.getByRole("button", { name: "Start using Folio" }).count()) await measure("tour: close", async () => { await p.getByRole("button", { name: "Start using Folio" }).tap(); }, 1200);
 
   // Data for the app screens
-  const text = fs.readFileSync(path.join(__dirname, "../tests/fixtures-user-oct26.txt"), "utf8");
+  const text = fs.readFileSync(path.join(__dirname, "../tests/fixtures-sample-messages.txt"), "utf8");
   await p.evaluate((text) => fetch("/api/sms/import", { method: "POST", headers: { "content-type": "application/json", "X-Folio": "1" }, body: JSON.stringify({ text }) }), text);
   await measure("launch: loader → home (cold)", async () => { await p.reload(); await p.waitForSelector(".month-panel", { timeout: 15000 }); }, 1500);
 
