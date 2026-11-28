@@ -1,68 +1,279 @@
+<div align="center">
+
+<img src="public/icons/folio.svg" width="96" height="96" alt="Folio" />
+
 # Folio
 
-Personal finance and investments: bank-message understanding, budgets, income and scholarships,
-a stock portfolio and an assistant that answers from your own records.
+**Your money, understood.**
 
-## Run locally
+A calm, Apple-inspired personal finance app. It reads your bank messages, keeps your budget honest,
+tracks scholarships to the yen and values your stocks at real prices. Every number on screen comes from your own records.
+
+[**Open Folio →**](https://folio-ivory-six.vercel.app)
+
+![React](https://img.shields.io/badge/React_18-20232a?style=flat-square&logo=react&logoColor=61dafb)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-646cff?style=flat-square&logo=vite&logoColor=white)
+![Motion](https://img.shields.io/badge/Motion-000000?style=flat-square&logo=framer&logoColor=white)
+![Postgres](https://img.shields.io/badge/Supabase_Postgres-3ecf8e?style=flat-square&logo=supabase&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-000000?style=flat-square&logo=vercel&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-41_passing-34c759?style=flat-square)
+
+<br />
+
+<img src="docs/images/hero.png" alt="Folio on iPhone: Plan, Home and Activity" />
+
+</div>
+
+<br />
+
+## Contents
+
+- [Highlights](#highlights)
+- [A tour of the app](#a-tour-of-the-app)
+- [Design](#design)
+- [How it works](#how-it-works)
+- [Run it locally](#run-it-locally)
+- [Deploy](#deploy-supabase--vercel)
+- [Project structure](#project-structure)
+- [Testing](#testing)
+- [Privacy and honesty](#privacy-and-honesty)
+
+<br />
+
+## Highlights
+
+| | |
+|---|---|
+| 💬 **Reads bank messages** | Paste or forward bank SMS and Folio pulls out the amount, merchant, card, date and balance, even from cut-off or misspelled names like `SEVEN-ELEVE` or `MOBILE SUIC`. |
+| 🏷️ **Sorts itself** | About 200 Japanese and Indian merchants are recognised out of the box. Correct one category and Folio remembers it. |
+| 🎯 **Budgets that keep up** | A monthly budget with pace, a projection labelled as an estimate, per-category limits and alerts before you go over. |
+| 🎓 **Scholarships, separately** | Expected payments are a schedule, not money. Only what's actually received is counted, and scholarships never mix with other income. |
+| 📈 **A real portfolio** | Holdings valued at market prices (Alpha Vantage), daily moves, returns, movers, news and earnings dates, plus your own plan for each stock. |
+| 💡 **Insights each visit** | Two lines under the greeting: what changed since you last looked, and one insight picked for the goals you chose. |
+| 🔔 **Push notifications** | Budget, scholarship, card-due, spending and weekly recaps, worded like a friend and quiet overnight. They work on iPhone from the Home Screen too. |
+| 🗣️ **Ask Folio** | Ask about your money in plain language. Answers are worked out from your records and labelled *Verified*, *Estimate* or *AI-generated*. |
+| 🎨 **Make it yours** | A Duolingo-style setup, eight accent colours that also restyle the app icon, light and dark themes, and your own cards and market watch. |
+
+<br />
+
+## A tour of the app
+
+<img src="docs/images/gallery.png" alt="Home, Activity, Plan and Ask" />
+
+**Home:** your cards stacked like Wallet (tap the one behind to bring it forward), this month at a glance,
+the latest transactions and your own TradingView market watch.
+**Activity:** every purchase grouped by day, with search and filters.
+**Plan:** budget pace, where the money went and month-by-month trends.
+**Ask:** questions answered from your records.
+
+<img src="docs/images/details.png" alt="Transaction detail, import, income and notifications" />
+
+Open any transaction to fix its category in one tap (Folio learns from it). Paste bank messages to see
+exactly how each will be read before anything is saved. Keep scholarships apart from other income,
+and choose which alerts reach your lock screen.
+
+### First run
+
+<img src="docs/images/onboarding.png" alt="The five-step setup" />
+
+New accounts are set up one question at a time, with the Folio mark as a guide that reacts to each answer.
+The setup asks for goals, currency, how money comes in, a budget, a colour and your cards. The answers shape the
+app: the currency, budget and accent, which cards appear, what the tour covers and which insights come first.
+
+### Light, dark and a guided tour
+
+<img src="docs/images/modes.png" alt="Dark mode, light mode, the guided tour and sign-in" />
+
+### On the desktop
+
+<img src="docs/images/desktop.png" alt="Folio on the desktop" />
+
+### Eight accent colours
+
+<img src="docs/images/accents.png" alt="The eight accent colours as app icons" />
+
+Each accent recolours buttons, highlights, the mark's gradient and the chart line, and comes with its own
+home-screen icon, so Folio added to an iPhone carries the colour you picked.
+
+> Screenshots use a demo account with sample data.
+
+<br />
+
+## Design
+
+Folio is designed with Apple's Human Interface Guidelines and the motion principles from Apple's
+*Designing Fluid Interfaces*:
+
+- **Calm and honest.** The amount is always the most prominent thing. Estimates say so, and nothing is invented.
+- **Native feel.** Grouped lists, sheets that rise and follow your finger, action sheets for destructive choices and Undo instead of "are you sure?".
+- **Fluid motion.** Springs that can be grabbed mid-flight and keep your swipe's speed, page changes that slide in the direction you're going, and screens that cascade in once.
+- **Accessible.** Text contrast of at least 4.5:1, nothing below 11pt and 44pt tap targets. Reduce Motion, Reduce Transparency and Increase Contrast are all supported.
+- **Smooth on phones.** Only transform and opacity animate. Expensive blurs pause during motion, and `npm run motion` measures every animation on a throttled iPhone (see [Testing](#testing)).
+
+<details>
+<summary><b>Motion details</b></summary>
+
+| Moment | What happens |
+|---|---|
+| Launch | The logo's stars trade places while data loads, then the screen fades away and Home cascades in |
+| Page change | The new page slides in from the side you're heading to, and the tab pill glides across |
+| Light ↔ dark | The new theme spreads as a circle from the button you pressed |
+| Sheets | Rise on a spring and track your drag 1:1. Letting go keeps your speed and decides by where it would land |
+| Cards | Tap the card behind and it springs forward while the others re-stack |
+| Numbers | Rise in character by character the first time, then count between values |
+| Tour | A spotlight glides between sections, built from compositor-only layers |
+| Background | A dithered candlestick chart flows across the lower screen and pauses while anything else moves |
+
+</details>
+
+<br />
+
+## How it works
+
+```mermaid
+flowchart LR
+  subgraph Phone["📱 Phone / browser"]
+    UI["React app<br/>(Vite, Motion)"]
+    SW["Service worker<br/>(push notifications)"]
+  end
+  subgraph Vercel["▲ Vercel"]
+    API["Express API<br/>api/index.ts"]
+    CRON["Daily & weekly<br/>scheduled runs"]
+  end
+  DB[("Supabase<br/>Postgres")]
+  AV["Alpha Vantage<br/>prices · news"]
+  TV["TradingView<br/>charts"]
+  AI["Claude<br/>(optional answers)"]
+
+  UI -- "/api" --> API
+  SMS["Bank SMS<br/>paste · file · Shortcut"] --> API
+  API --> DB
+  CRON --> API
+  API -- "Web Push" --> SW
+  API --> AV
+  API -.-> AI
+  UI -. embed .-> TV
+```
+
+**Bank messages.** A website can't read SMS, and on iPhone no app can. Folio takes messages in
+four ways: paste them, import a file (text, JSON or an Android *SMS Backup & Restore* XML), share them from Android once Folio
+is installed, or automatically via a personal endpoint (`POST /api/ingest/sms` with a bearer token) for an
+iOS Shortcuts automation or an Android SMS forwarder.
+
+**Parsing.** `shared/sms.ts` classifies each message (transaction, balance, OTP, promo, failed, reminder)
+and extracts its fields. `shared/merchants.ts` matches merchants in three steps: exactly, from a cut-off
+descriptor, then with a small typo allowance, with guards against look-alikes. Duplicates are caught by message and
+by fingerprint, and two identical purchases on one day are told apart by the balance left afterwards.
+
+**Notifications.** Web Push with server-generated signing keys stored encrypted. Every alert has a key so
+it's never sent twice, and alerts during a phone's quiet hours wait for the morning run.
+
+<br />
+
+## Run it locally
 
 ```bash
 npm install
 npm run build
-npm start          # http://localhost:8787
+npm start            # http://localhost:8787
 ```
 
-Development with hot reload: `npm run dev` (web on 5173, API on 8787). Tests: `npm test`.
+For development with hot reload, use `npm run dev` (web on 5173, API on 8787).
 
-Without `DATABASE_URL`, Folio uses an embedded Postgres (PGlite) stored in `data/pglite`, so no
-database server is needed locally. Set `DATABASE_URL` to run against Supabase instead (copy
-`.env.example` to `.env.local` and export it).
+No database setup is needed locally. Without `DATABASE_URL`, Folio uses an embedded Postgres (PGlite) in `data/pglite`.
+
+| Script | What it does |
+|---|---|
+| `npm run dev` | API and web with hot reload |
+| `npm run build` | Production build into `dist/` |
+| `npm start` | Serve the built app and API |
+| `npm test` | API and parser tests |
+| `npm run typecheck` | TypeScript, no emit |
+| `npm run motion` | Frame-timing check of every animation (server must be running) |
+
+<br />
 
 ## Deploy: Supabase + Vercel
 
-**1. Supabase (database)**
+**1. Database (Supabase).** Create a project, then go to **Connect** and copy the **Transaction pooler** string
+(port 6543) with your password in it. Folio creates its own tables on first request. Row-level security is on with no
+policies, so Supabase's public Data API can't touch them; only the app's own connection can.
 
-1. Create a project at supabase.com.
-2. Project → **Connect** → copy the **Transaction pooler** connection string (port 6543) and
-   put your database password in it.
-3. Optional: Project Settings → Database → **SSL Configuration** → download the certificate.
+**2. App (Vercel).** Import the repository; the build settings come from `vercel.json`. Then add the
+environment variables below and deploy.
 
-Folio creates its tables on first request. It does not use Supabase Auth or the Supabase client;
-it connects to Postgres directly. Every table has row-level security switched on with no
-policies, so Supabase's public Data API cannot read or write them — only the app's own
-connection can, and the app scopes every query to the signed-in user.
+| Variable | Required | Purpose |
+|---|---|---|
+| `DATABASE_URL` | ✅ | Supabase transaction-pooler connection string |
+| `FOLIO_SECRET` | ✅ | Long random string (`openssl rand -hex 32`). Encrypts saved keys; keep it stable |
+| `DATABASE_CA` | | The database's SSL certificate, to verify the server |
+| `CRON_SECRET` | | Protects the scheduled notification runs |
 
-**2. Vercel (app)**
+Without the two required variables, the function refuses to start rather than fall back to anything that could lose data.
+Market data and AI answers use keys you add in the app's Settings (Alpha Vantage and Anthropic). Without an
+Anthropic key, Ask still answers the common questions directly from your records.
 
-1. Push the `folio` folder to a GitHub repository and import it in Vercel. The settings come
-   from `vercel.json` (build `vite build`, output `dist`, API function `api/index.ts`).
-2. Project → Settings → Environment Variables:
-   - `DATABASE_URL` — the Supabase connection string from step 1.
-   - `FOLIO_SECRET` — a long random string (`openssl rand -hex 32`). Keep it stable; it encrypts
-     saved API keys.
-   - `DATABASE_CA` — optional, the certificate contents from step 1, to verify the database server.
-3. Deploy.
+<br />
 
-The function refuses to start without `DATABASE_URL` and `FOLIO_SECRET` on Vercel rather than
-falling back to anything that would lose data.
+## Project structure
 
-## What needs your own keys (in the app's Settings)
+```
+api/index.ts              Vercel function (the Express app)
+server/
+  app.ts                  Routes, security headers, scheduled-run endpoint
+  db.ts                   Postgres (Supabase via pg, or PGlite locally) and schema
+  auth.ts                 Accounts, sessions, rate limiting
+  routes/                 core (transactions, accounts, budgets, push), income, portfolio
+  services/
+    ingest.ts             Bank messages → transactions, duplicates, learning
+    insights.ts           The two lines under Home's greeting
+    notify.ts             Push notifications: wording, quiet hours, scheduled runs
+    summary.ts            Spending, budgets, income totals
+    market.ts             Alpha Vantage, cached and paced
+    assistant.ts          Ask Folio
+shared/
+  sms.ts                  Bank-message parser
+  merchants.ts            Merchant dictionary with fuzzy matching
+  accents.ts              Accent colours, app icons, manifests
+src/
+  screens/                Home, Activity, Plan, Invest, Assistant, Settings, Setup, Tour, sheets
+  ui/                     Design-system pieces: sheets, springs, motion, charts, cards, logo
+  components/             Background animation, TradingView embed, text effects
+  styles.css              Design tokens and styles
+public/                   Icons per accent, manifests, service worker
+tests/                    API, parser and notification tests
+scripts/                  Icon generator, motion check
+```
 
-- **Share prices, news, earnings**: an Alpha Vantage key.
-- **Open-ended assistant answers**: an Anthropic API key. Without it the assistant still answers
-  the common questions directly from your records.
+<br />
 
-## Getting bank messages in
+## Testing
 
-A website cannot read SMS. Folio supports pasting, importing a file (text, JSON, Android SMS
-backup XML), the Android share sheet once Folio is installed to the home screen, and a personal
-endpoint (`POST /api/ingest/sms` with a bearer token) for an iOS Shortcuts automation or an
-Android SMS-forwarder app. See the Automatic tab in the importer.
+```bash
+npm test             # 41 tests: parser, merchants, API, budgets, income, notifications
+npm run motion       # frame timing on an emulated iPhone at 4× CPU slowdown
+```
 
-## Layout
+The motion check runs every animation in the app and reports dropped frames. After the motion pass:
 
-- `server/app.ts` — the API (Express). `server/index.ts` runs it locally; `api/index.ts` is the
-  Vercel function.
-- `server/db.ts` — database access and schema (Supabase via `pg`, or PGlite locally).
-- `shared/sms.ts` — the SMS parser; `shared/merchants.ts` — the merchant dictionary.
-- `src/` — the web app; design tokens in `src/styles.css`.
-- `docs/PLAN.md` — product rules and architecture.
+| Interaction | Janky frames |
+|---|---|
+| Sheets open / close | 0–9% |
+| Page changes | 3–10% |
+| Scrolling | ~1% |
+| Background, idle | 0% |
+
+<br />
+
+## Privacy and honesty
+
+- **Your data stays yours.** Every query is scoped to the signed-in account. Only the last four digits of a card are ever stored, never a full number or CVV.
+- **Nothing is invented.** Balances come from bank messages or your own entries. Prices come from a market-data provider or aren't shown. Expected income is never counted as received.
+- **Everything is labelled.** Every figure is either verified from your records, marked as an estimate or marked as AI-generated.
+
+<br />
+
+<div align="center">
+<sub>Built with care for the details. <a href="https://folio-ivory-six.vercel.app">folio-ivory-six.vercel.app</a></sub>
+</div>
